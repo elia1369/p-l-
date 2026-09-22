@@ -334,60 +334,61 @@ export const PortfolioCharts: React.FC<Props> = ({ assets, trades, lang }) => {
             </div>
           )}
 
-          {/* Pie Chart Canvas */}
-          <div className="h-[250px] w-full relative my-auto">
+          {/* Pie Chart Canvas (Clean donut chart without text overlay) */}
+          <div className="h-[230px] w-full relative my-auto">
             {pieData.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip content={renderPieTooltip} />
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={88}
-                      paddingAngle={4}
-                      dataKey="value"
-                      onMouseEnter={(_, index) => setActivePieIndex(index)}
-                      onMouseLeave={() => setActivePieIndex(null)}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${entry.symbol}-${index}`}
-                          fill={entry.color}
-                          stroke="transparent"
-                          className="transition-all duration-200 outline-none"
-                          style={{
-                            filter: activePieIndex === index ? 'brightness(1.15)' : 'none',
-                            transform: activePieIndex === index ? 'scale(1.04)' : 'scale(1)',
-                            transformOrigin: 'center center',
-                          }}
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-
-                {/* Center Badge showing Total Value */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                    {t.totalPortfolioValue}
-                  </span>
-                  <span className="text-base sm:text-lg font-black font-mono text-slate-900 dark:text-slate-100">
-                    {formatCurrency(totalPieValue, lang, dominantCurrency)}
-                  </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {pieData.length} {lang === 'fa' ? 'دارایی' : 'assets'}
-                  </span>
-                </div>
-              </>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip content={renderPieTooltip} />
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={84}
+                    paddingAngle={3}
+                    dataKey="value"
+                    onMouseEnter={(_, index) => setActivePieIndex(index)}
+                    onMouseLeave={() => setActivePieIndex(null)}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${entry.symbol}-${index}`}
+                        fill={entry.color}
+                        stroke="transparent"
+                        className="transition-all duration-200 outline-none"
+                        style={{
+                          filter: activePieIndex === index ? 'brightness(1.15)' : 'none',
+                          transform: activePieIndex === index ? 'scale(1.04)' : 'scale(1)',
+                          transformOrigin: 'center center',
+                        }}
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-slate-400">
                 {t.noTradesFound}
               </div>
             )}
           </div>
+
+          {/* Clean Total Value Card positioned below the donut chart */}
+          {pieData.length > 0 && (
+            <div className="mt-2 mb-3 py-2 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                <span>{t.totalPortfolioValue}</span>
+                <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                  ({pieData.length} {lang === 'fa' ? 'دارایی' : 'assets'})
+                </span>
+              </div>
+              <div className="text-sm sm:text-base font-black font-mono text-slate-900 dark:text-slate-100">
+                {formatCurrency(totalPieValue, lang, dominantCurrency)}
+              </div>
+            </div>
+          )}
 
           {/* Asset Chips / Legend */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-2">

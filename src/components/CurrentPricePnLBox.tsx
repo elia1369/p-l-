@@ -9,11 +9,14 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   Percent,
-  Coins
+  Coins,
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 import { AssetAnalysis, Language, CurrencyKind } from '../types';
 import { translations, formatCurrency, formatPercent, formatNumber } from '../utils/i18n';
 import { CurrencyLogo } from './CurrencyLogo';
+import { fetchWallexMarkets, findWallexMarket, WallexMarket } from '../utils/wallexApi';
 
 interface Props {
   assets?: AssetAnalysis[];
@@ -54,6 +57,38 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
   // Active selected asset
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
 
+  // Wallex Live Markets state (from GET /hector/web/v1/markets)
+  const [wallexMarkets, setWallexMarkets] = useState<WallexMarket[]>([]);
+  const [isLoadingWallex, setIsLoadingWallex] = useState<boolean>(false);
+  const [wallexError, setWallexError] = useState<string | null>(null);
+  const [lastLivePriceFetched, setLastLivePriceFetched] = useState<number | null>(null);
+  const [isManualOverride, setIsManualOverride] = useState<boolean>(false);
+
+  // Load Wallex markets on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadMarkets = async () => {
+      setIsLoadingWallex(true);
+      setWallexError(null);
+      try {
+        const list = await fetchWallexMarkets();
+        if (isMounted) {
+          setWallexMarkets(list);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setWallexError(err?.message || 'خطا در بارگذاری بازارهای والکس');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingWallex(false);
+        }
+      }
+    };
+    loadMarkets();
+    return () => { isMounted = false; };
+  }, []);
+
   // Keep selectedSymbol valid when assets list changes
   useEffect(() => {
     if (assets.length > 0) {
@@ -69,12 +104,28 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
     return assets.find(a => a.symbol === selectedSymbol) || assets[0];
   }, [assets, selectedSymbol]);
 
+  // Find active Wallex market for current activeAsset
+  const activeWallexMarket = useMemo(() => {
+    if (!activeAsset || wallexMarkets.length === 0) return undefined;
+    return findWallexMarket(wallexMarkets, activeAsset.symbol, activeAsset.currency);
+  }, [activeAsset, wallexMarkets]);
+
   // Input state for Current Price
   const [priceInputText, setPriceInputText] = useState<string>('');
 
-  // Synchronize input text when active asset or external price updates
+  // Automatically inject the live market price from GET /hector/web/v1/markets when asset or market loads!
   useEffect(() => {
-    if (activeAsset) {
+    if (activeAsset && activeWallexMarket) {
+      const livePrice = parseFloat(activeWallexMarket.price);
+      if (livePrice > 0) {
+        setPriceInputText(String(livePrice));
+        setLastLivePriceFetched(livePrice);
+        setIsManualOverride(false);
+        if (onUpdatePrice) {
+          onUpdatePrice(activeAsset.symbol, livePrice);
+        }
+      }
+    } else if (activeAsset && !activeWallexMarket) {
       const current = customPrices[activeAsset.symbol] ?? activeAsset.currentPrice;
       if (current > 0) {
         setPriceInputText(String(current));
@@ -82,13 +133,53 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
         setPriceInputText('');
       }
     }
-  }, [activeAsset?.symbol, customPrices[activeAsset?.symbol || '']]);
+  }, [activeAsset?.symbol, activeWallexMarket?.symbol, activeWallexMarket?.price]);
+
+  // Manual refresh of live price from API
+  const handleRefreshLivePrice = async () => {
+    if (!activeAsset) return;
+    setIsLoadingWallex(true);
+    setWallexError(null);
+    try {
+      const freshMarkets = await fetchWallexMarkets(true);
+      setWallexMarkets(freshMarkets);
+      const matched = findWallexMarket(freshMarkets, activeAsset.symbol, activeAsset.currency);
+      if (matched) {
+        const livePrice = parseFloat(matched.price);
+        if (livePrice > 0) {
+          setPriceInputText(String(livePrice));
+          setLastLivePriceFetched(livePrice);
+          setIsManualOverride(false);
+          if (onUpdatePrice) {
+            onUpdatePrice(activeAsset.symbol, livePrice);
+          }
+        }
+      }
+    } catch (err: any) {
+      setWallexError(err?.message || 'خطا در بروزرسانی قیمت');
+    } finally {
+      setIsLoadingWallex(false);
+    }
+  };
 
   const handlePriceChange = (val: string) => {
     setPriceInputText(val);
+    setIsManualOverride(true);
     const parsed = parsePriceInput(val);
     if (activeAsset && onUpdatePrice) {
       onUpdatePrice(activeAsset.symbol, parsed);
+    }
+  };
+
+  const handleResetToLivePrice = () => {
+    if (lastLivePriceFetched && lastLivePriceFetched > 0 && activeAsset) {
+      setPriceInputText(String(lastLivePriceFetched));
+      setIsManualOverride(false);
+      if (onUpdatePrice) {
+        onUpdatePrice(activeAsset.symbol, lastLivePriceFetched);
+      }
+    } else {
+      handleRefreshLivePrice();
     }
   };
 
@@ -156,21 +247,25 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
               {t.selectAsset}:
             </span>
             <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
-              {assets.map(a => (
-                <button
-                  key={a.symbol}
-                  type="button"
-                  onClick={() => setSelectedSymbol(a.symbol)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    selectedSymbol === a.symbol
-                      ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <CurrencyLogo currency={a.currency} lang={lang} size="xs" />
-                  <span>{a.symbol}</span>
-                </button>
-              ))}
+              {assets.map(a => {
+                const m = wallexMarkets.length > 0 ? findWallexMarket(wallexMarkets, a.symbol, a.currency) : undefined;
+                const label = m?.fa_base_asset && lang === 'fa' ? `${m.fa_base_asset} (${a.symbol})` : a.symbol;
+                return (
+                  <button
+                    key={a.symbol}
+                    type="button"
+                    onClick={() => setSelectedSymbol(a.symbol)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                      selectedSymbol === a.symbol
+                        ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <CurrencyLogo currency={a.currency} lang={lang} size="xs" />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -216,21 +311,61 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
             {/* 2. User Input Field: "قیمت فعلی ارز" (Requested explicitly) */}
             <div 
               id="box-current-price-user-input"
-              className="p-4 rounded-xl bg-white dark:bg-slate-800/90 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-xs flex flex-col justify-between"
+              className="p-4 rounded-xl bg-white dark:bg-slate-800/90 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-xs flex flex-col justify-between transition-all"
             >
               <div>
-                {/* Requested Label and Field Alignment */}
+                {/* Header: Label and Live Wallex API Badge */}
                 <div className="flex items-center justify-between mb-2">
-                  <label 
-                    htmlFor="current-asset-price-input" 
-                    className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5"
-                  >
-                    <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>{t.currentAssetPriceLabel}:</span>
-                  </label>
-                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                    {lang === 'fa' ? 'ورودی کاربر' : 'User Input'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <label 
+                      htmlFor="current-asset-price-input" 
+                      className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5"
+                    >
+                      <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>{t.currentAssetPriceLabel}:</span>
+                    </label>
+                  </div>
+
+                  {/* Live Status Badge & Refresh from Wallex API */}
+                  <div className="flex items-center gap-1.5">
+                    {isLoadingWallex ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>{lang === 'fa' ? 'دریافت نرخ...' : 'Fetching...'}</span>
+                      </span>
+                    ) : activeWallexMarket ? (
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          title="GET /hector/web/v1/markets"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-md border border-emerald-500/20"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>{lang === 'fa' ? 'نرخ زنده والکس' : 'Wallex Live'}</span>
+                        </span>
+                        {typeof activeWallexMarket.change_24h === 'number' && (
+                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${
+                            activeWallexMarket.change_24h >= 0 
+                              ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' 
+                              : 'text-rose-700 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-300'
+                          }`}>
+                            {activeWallexMarket.change_24h >= 0 ? '+' : ''}{activeWallexMarket.change_24h}%
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleRefreshLivePrice}
+                          title={lang === 'fa' ? 'بروزرسانی مجدد از API والکس' : 'Refresh live price from API'}
+                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                        {lang === 'fa' ? 'ورودی کاربر' : 'User Input'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Input Field directly in front of the label */}
@@ -241,18 +376,59 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                     inputMode="decimal"
                     value={priceInputText}
                     onChange={(e) => handlePriceChange(e.target.value)}
-                    placeholder={activeAsset.currency === 'TMN' ? 'مثلاً 720000' : 'مثلاً 97500'}
+                    placeholder={activeAsset.currency === 'TMN' ? 'مثلاً 21700' : 'مثلاً 0.0935'}
                     className="w-full font-mono text-lg sm:text-xl font-black py-2.5 px-3.5 pe-20 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-slate-100 transition"
                   />
                   <div className="absolute top-1/2 -translate-y-1/2 end-3 flex items-center gap-1 pointer-events-none text-xs font-bold text-slate-500 dark:text-slate-400">
                     <CurrencyLogo currency={activeAsset.currency} lang={lang} size="xs" />
                   </div>
                 </div>
+
+                {/* Live Wallex Market Details & Auto-Fill Feedback */}
+                {activeWallexMarket && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {activeWallexMarket.symbol}
+                      </span>
+                      {activeWallexMarket.fa_base_asset && (
+                        <span className="text-slate-600 dark:text-slate-300 font-medium">({activeWallexMarket.fa_base_asset})</span>
+                      )}
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        <span>{lang === 'fa' ? 'ثبت خودکار از API والکس' : 'Auto-filled via Wallex API'}</span>
+                      </span>
+                    </div>
+
+                    {isManualOverride && lastLivePriceFetched && (
+                      <button
+                        type="button"
+                        onClick={handleResetToLivePrice}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold transition cursor-pointer"
+                      >
+                        {lang === 'fa' 
+                          ? `بازگشت به نرخ زنده (${formatNumber(lastLivePriceFetched, lang)})` 
+                          : `Reset to Live (${lastLivePriceFetched})`}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Quick Preset Buttons for rapid testing */}
               <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/80 flex flex-wrap items-center gap-1.5 text-[11px]">
                 <span className="text-slate-400">{lang === 'fa' ? 'تنظیم سریع:' : 'Quick Set:'}</span>
+                {activeWallexMarket && (
+                  <button
+                    type="button"
+                    onClick={handleResetToLivePrice}
+                    className="px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Activity className="w-3 h-3" />
+                    <span>{lang === 'fa' ? 'نرخ لحظه‌ای والکس' : 'Live Wallex Price'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleApplyPreset(5)}

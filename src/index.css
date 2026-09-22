@@ -19,11 +19,18 @@
     -moz-osx-font-smoothing: grayscale;
     background-color: #f8fafc;
     color: #0f172a;
+    font-feature-settings: "cv01", "cv02", "tnum";
   }
 
   html.dark body {
     background-color: #020617;
     color: #f8fafc;
+  }
+
+  /* Ensure all mono financial numbers use tabular alignment */
+  .font-mono {
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
   }
 
   input[type="number"]::-webkit-inner-spin-button,

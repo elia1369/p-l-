@@ -713,6 +713,40 @@ export function getDemoTrades(): TradeRecord[] {
       fee: 63900,
       orderId: '***943009',
     },
+    // HBAR / TMN (هدرا هشگراف) Transactions
+    {
+      id: 'demo-15',
+      date: '2025-02-15 09:30:00',
+      symbol: 'HBAR/TMN',
+      side: 'BUY',
+      price: 20200,
+      quantity: 2500,
+      total: 50500000,
+      fee: 75750,
+      orderId: '***951001',
+    },
+    {
+      id: 'demo-16',
+      date: '2025-02-20 17:45:00',
+      symbol: 'HBAR/TMN',
+      side: 'BUY',
+      price: 20800,
+      quantity: 1500,
+      total: 31200000,
+      fee: 46800,
+      orderId: '***952002',
+    },
+    {
+      id: 'demo-17',
+      date: '2025-02-24 12:10:00',
+      symbol: 'HBAR/TMN',
+      side: 'SELL',
+      price: 21500,
+      quantity: 1000,
+      total: 21500000,
+      fee: 32250,
+      orderId: '***953003',
+    },
   ];
 }
 

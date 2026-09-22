@@ -233,34 +233,46 @@ export const TradesTable: React.FC<Props> = ({
 
         {/* Quick Side-Aware Volume & Fee Summary Badge */}
         {filteredTrades.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-[11px]">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800 text-xs">
+            {/* Inflow (Buy) */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 p-2 rounded-lg bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/15">
+              <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>{lang === 'fa' ? 'مجموع ورودی (خرید):' : 'Total Inflow (Buy):'}</span>
-                <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono font-black text-emerald-700 dark:text-emerald-300 text-sm">
                   {formatNumber(filteredTrades.filter(t => t.side === 'BUY').reduce((acc, t) => acc + t.quantity, 0), lang)}
                 </span>
                 <span className="text-slate-400 font-mono text-[10px]">
-                  ({filteredTrades.filter(t => t.side === 'BUY').length} {lang === 'fa' ? 'معامله' : 'trades'} | {t.fee}: {formatNumber(filteredTrades.filter(t => t.side === 'BUY').reduce((acc, t) => acc + (t.fee || 0), 0), lang)})
+                  ({filteredTrades.filter(t => t.side === 'BUY').length} {lang === 'fa' ? 'معامله' : 'tr.'})
                 </span>
-              </span>
+              </div>
+            </div>
 
-              <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+            {/* Outflow (Sell) */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 p-2 rounded-lg bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/15">
+              <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>
                 <span>{lang === 'fa' ? 'مجموع خروجی (فروش):' : 'Total Outflow (Sell):'}</span>
-                <span className="font-mono font-bold text-rose-700 dark:text-rose-300">
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono font-black text-rose-700 dark:text-rose-300 text-sm">
                   {formatNumber(filteredTrades.filter(t => t.side === 'SELL').reduce((acc, t) => acc + t.quantity, 0), lang)}
                 </span>
                 <span className="text-slate-400 font-mono text-[10px]">
-                  ({filteredTrades.filter(t => t.side === 'SELL').length} {lang === 'fa' ? 'معامله' : 'trades'} | {t.fee}: {formatNumber(filteredTrades.filter(t => t.side === 'SELL').reduce((acc, t) => acc + (t.fee || 0), 0), lang)})
+                  ({filteredTrades.filter(t => t.side === 'SELL').length} {lang === 'fa' ? 'معامله' : 'tr.'})
                 </span>
-              </span>
+              </div>
             </div>
 
-            <div className="text-slate-500 dark:text-slate-400 font-mono">
-              <span>{lang === 'fa' ? 'مانده موجودی باز:' : 'Net Open Balance:'} </span>
-              <span className="font-bold text-slate-900 dark:text-slate-100">
+            {/* Net Open Balance */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 p-2 rounded-lg bg-slate-100/70 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
+                <span>{lang === 'fa' ? 'مانده موجودی باز:' : 'Net Open Balance:'}</span>
+              </div>
+              <span className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
                 {formatNumber(
                   filteredTrades.filter(t => t.side === 'BUY').reduce((acc, t) => acc + t.quantity, 0) -
                   filteredTrades.filter(t => t.side === 'SELL').reduce((acc, t) => acc + t.quantity, 0),
@@ -274,28 +286,28 @@ export const TradesTable: React.FC<Props> = ({
 
       {/* Responsive Table Container */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs text-right sm:text-right" dir={lang === 'fa' ? 'rtl' : 'ltr'}>
-          <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+        <table className="w-full text-xs" dir={lang === 'fa' ? 'rtl' : 'ltr'}>
+          <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase tracking-wider">
             <tr>
-              <th className="py-3 px-4">{t.date}</th>
-              <th className="py-3 px-4">{t.symbol}</th>
-              <th className="py-3 px-4">{t.type}</th>
-              <th className="py-3 px-4">{t.price}</th>
-              <th className="py-3 px-4 text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50/40 dark:bg-emerald-950/20">
+              <th className="py-3 px-3.5 text-start whitespace-nowrap">{t.date}</th>
+              <th className="py-3 px-3.5 text-start whitespace-nowrap">{t.symbol}</th>
+              <th className="py-3 px-3.5 text-center whitespace-nowrap">{t.type}</th>
+              <th className="py-3 px-3.5 text-end whitespace-nowrap font-mono">{t.price}</th>
+              <th className="py-3 px-3.5 text-end whitespace-nowrap text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50/50 dark:bg-emerald-950/20 font-mono">
                 {t.buyInflow}
               </th>
-              <th className="py-3 px-4 text-rose-700 dark:text-rose-300 font-bold bg-rose-50/40 dark:bg-rose-950/20">
+              <th className="py-3 px-3.5 text-end whitespace-nowrap text-rose-700 dark:text-rose-300 font-bold bg-rose-50/50 dark:bg-rose-950/20 font-mono">
                 {t.sellOutflow}
               </th>
-              <th className="py-3 px-4 font-bold bg-slate-100/60 dark:bg-slate-800/80">
+              <th className="py-3 px-3.5 text-end whitespace-nowrap font-bold bg-slate-100/70 dark:bg-slate-800/90 font-mono">
                 {t.runningBalance}
               </th>
-              <th className="py-3 px-4">{t.total}</th>
-              <th className="py-3 px-4">{t.fee}</th>
-              <th className="py-3 px-4 text-center">{t.actions}</th>
+              <th className="py-3 px-3.5 text-end whitespace-nowrap font-mono">{t.total}</th>
+              <th className="py-3 px-3.5 text-end whitespace-nowrap font-mono">{t.fee}</th>
+              <th className="py-3 px-3.5 text-center whitespace-nowrap">{t.actions}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
             {paginatedTrades.length > 0 ? (
               paginatedTrades.map((trade) => {
                 const isBuy = trade.side === 'BUY';
@@ -303,40 +315,40 @@ export const TradesTable: React.FC<Props> = ({
                 return (
                   <tr 
                     key={trade.id} 
-                    className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    <td className="py-2.5 px-3.5 text-start font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {trade.date}
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    <td className="py-2.5 px-3.5 text-start font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span>{trade.symbol}</span>
                         <CurrencyLogo symbolOrCurrency={trade.symbol} lang={lang} size="xs" showLabel={false} />
                       </div>
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
+                    <td className="py-2.5 px-3.5 text-center whitespace-nowrap font-sans">
                       <button
                         type="button"
                         onClick={() => onToggleSide && onToggleSide(trade.id)}
                         disabled={!onToggleSide}
                         title={onToggleSide ? (lang === 'fa' ? 'کلیک برای تغییر نوع معامله (خرید/فروش)' : 'Click to toggle Buy/Sell') : undefined}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold text-[11px] transition ${
-                          onToggleSide ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''
+                        className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-md font-bold text-[11px] transition ${
+                          onToggleSide ? 'cursor-pointer hover:opacity-85 active:scale-95' : ''
                         } ${
                           isBuy 
-                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20' 
-                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 hover:bg-rose-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/20' 
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/25 hover:bg-rose-500/20'
                         }`}
                       >
                         {isBuy ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
                         <span>{isBuy ? (lang === 'fa' ? 'ورودی (خرید)' : 'BUY') : (lang === 'fa' ? 'خروجی (فروش)' : 'SELL')}</span>
                       </button>
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
+                    <td className="py-2.5 px-3.5 text-end font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap font-semibold">
                       {formatCurrency(trade.price, lang, trade.symbol)}
                     </td>
                     {/* Separate Buy Inflow Column */}
-                    <td className="py-3 px-4 font-mono font-semibold whitespace-nowrap bg-emerald-50/20 dark:bg-emerald-950/10">
+                    <td className="py-2.5 px-3.5 text-end font-mono font-bold whitespace-nowrap bg-emerald-50/25 dark:bg-emerald-950/15">
                       {isBuy ? (
                         <span className="text-emerald-700 dark:text-emerald-300">
                           +{formatNumber(trade.quantity, lang)}
@@ -346,7 +358,7 @@ export const TradesTable: React.FC<Props> = ({
                       )}
                     </td>
                     {/* Separate Sell Outflow Column */}
-                    <td className="py-3 px-4 font-mono font-semibold whitespace-nowrap bg-rose-50/20 dark:bg-rose-950/10">
+                    <td className="py-2.5 px-3.5 text-end font-mono font-bold whitespace-nowrap bg-rose-50/25 dark:bg-rose-950/15">
                       {!isBuy ? (
                         <span className="text-rose-700 dark:text-rose-300">
                           -{formatNumber(trade.quantity, lang)}
@@ -356,18 +368,18 @@ export const TradesTable: React.FC<Props> = ({
                       )}
                     </td>
                     {/* Running Balance */}
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap bg-slate-50/50 dark:bg-slate-800/40">
+                    <td className="py-2.5 px-3.5 text-end font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap bg-slate-50/70 dark:bg-slate-800/50">
                       {bal !== undefined ? formatNumber(bal, lang) : '-'}
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    <td className="py-2.5 px-3.5 text-end font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {formatCurrency(trade.total, lang, trade.symbol)}
                     </td>
-                    <td className="py-3 px-4 font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap font-medium">
-                      <div className="flex items-center gap-1.5">
+                    <td className="py-2.5 px-3.5 text-end font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap font-semibold">
+                      <div className="flex items-center justify-end gap-1.5">
                         <span>{formatCurrency(trade.fee, lang, trade.symbol)}</span>
                         {trade.total > 0 && trade.fee > 0 && (
                           <span 
-                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                            className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/20"
                             title={lang === 'fa' ? 'درصد کارمزد از مجموع معامله' : 'Fee % of trade total'}
                           >
                             {((trade.fee / trade.total) * 100).toFixed(2)}%
@@ -375,12 +387,12 @@ export const TradesTable: React.FC<Props> = ({
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                    <td className="py-2.5 px-3.5 text-center whitespace-nowrap font-sans">
                       <button
                         type="button"
                         onClick={() => onDeleteTrade(trade.id)}
                         title={lang === 'fa' ? 'حذف این ردیف' : 'Delete record'}
-                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -390,7 +402,7 @@ export const TradesTable: React.FC<Props> = ({
               })
             ) : (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-slate-400">
+                <td colSpan={10} className="py-12 text-center text-slate-400 font-sans">
                   {t.noTradesFound}
                 </td>
               </tr>

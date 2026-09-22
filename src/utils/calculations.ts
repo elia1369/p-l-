@@ -2,6 +2,25 @@ import { TradeRecord, AssetAnalysis, PortfolioSummary } from '../types';
 import { detectCurrency } from './i18n';
 
 /**
+ * Ensures fees are realistic and not accidentally multiplied by price or corrupted
+ */
+export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number }): number {
+  let fee = trade.fee || 0;
+  const p = Number(trade.price) || 0;
+  const q = Number(trade.quantity) || 0;
+  const gross = p * q;
+  // If fee is greater than 10% of gross trade turnover, it was likely miscalculated or multiplied by price accidentally
+  if (gross > 0 && fee > gross * 0.1) {
+    if (p > 0 && (fee / p) <= gross * 0.05) {
+      fee = fee / p;
+    } else {
+      fee = gross * 0.002; // standard 0.2% fee fallback
+    }
+  }
+  return fee;
+}
+
+/**
  * Calculates per-asset metrics including:
  * - Average Buy Price
  * - Average Sell Price
@@ -59,7 +78,7 @@ export function calculateAssetAnalyses(
 
     // Separate BUY and SELL metrics and collect fee totals per side
     sortedTrades.forEach(trade => {
-      const tradeFee = trade.fee || 0;
+      const tradeFee = getSanitizedTradeFee(trade);
       if (trade.side === 'BUY') {
         buyTradesCount++;
         totalBuyQty += trade.quantity;
@@ -92,7 +111,7 @@ export function calculateAssetAnalyses(
     let closedSellFees = 0;
 
     sortedTrades.forEach(trade => {
-      const tradeFee = trade.fee || 0;
+      const tradeFee = getSanitizedTradeFee(trade);
       if (trade.side === 'BUY') {
         if (trade.quantity > 0) {
           buyQueue.push({
@@ -230,7 +249,7 @@ export function calculatePortfolioSummary(
   let losingAssetsCount = 0;
 
   trades.forEach(t => {
-    const fee = t.fee || 0;
+    const fee = getSanitizedTradeFee(t);
     totalFeesPaid += fee;
     if (t.side === 'BUY') {
       totalBuyValue += t.price * t.quantity;
@@ -283,7 +302,7 @@ export function calculatePortfolioSummary(
     let tmnBuyFees = 0;
     let tmnSellFees = 0;
     tmnTrades.forEach(t => {
-      const fee = t.fee || 0;
+      const fee = getSanitizedTradeFee(t);
       tmnFees += fee;
       if (t.side === 'BUY') {
         tmnBuyVal += t.price * t.quantity;
@@ -324,7 +343,7 @@ export function calculatePortfolioSummary(
     let usdBuyFees = 0;
     let usdSellFees = 0;
     usdTrades.forEach(t => {
-      const fee = t.fee || 0;
+      const fee = getSanitizedTradeFee(t);
       usdFees += fee;
       if (t.side === 'BUY') {
         usdBuyVal += t.price * t.quantity;
