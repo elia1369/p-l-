@@ -1,0 +1,6 @@
+{
+  "name": "Trade P&L Analyzer",
+  "description": "سیستم پیشرفته محاسبه و تحلیل سود و زیان (P&L)، میانگین قیمت خرید و فروش، کارمزدها و نقطه سر‌به‌سر با امنیت کامل PII و پشتیبانی اکسل",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
