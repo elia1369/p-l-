@@ -9,13 +9,83 @@ import {
   Scale
 } from 'lucide-react';
 import { PortfolioSummary, Language, CurrencyKind } from '../types';
-import { translations, formatCurrency, formatPercent } from '../utils/i18n';
+import { translations, formatPercent } from '../utils/i18n';
 import { CurrencyLogo } from './CurrencyLogo';
 
 interface Props {
   summary: PortfolioSummary;
   lang: Language;
 }
+
+interface FormattedOverviewAmountProps {
+  amount: number;
+  currency: CurrencyKind;
+  lang: Language;
+  colorClass?: string;
+  size?: 'main' | 'sub';
+}
+
+const FormattedOverviewAmount: React.FC<FormattedOverviewAmountProps> = ({
+  amount,
+  currency,
+  lang,
+  colorClass,
+  size = 'main'
+}) => {
+  const isToman = currency === 'TMN';
+  const absNum = Math.abs(amount || 0);
+  const sign = amount < 0 ? '-' : '';
+
+  // Decimals handling:
+  // For Toman, small numbers (<100) keep 2 decimals, medium (<100k) keep 1-2, large amounts (>=100k) don't need clutter decimals
+  let maxDec = 2;
+  if (isToman) {
+    maxDec = absNum >= 100000 ? (Number.isInteger(absNum) ? 0 : 2) : 2;
+  } else {
+    maxDec = absNum < 1 && absNum > 0 ? 4 : 2;
+  }
+
+  const numStr = absNum.toLocaleString('en-US', {
+    maximumFractionDigits: maxDec,
+    minimumFractionDigits: 0,
+  });
+
+  const fullDisplay = `${sign}${numStr}`;
+  const unit = isToman ? (lang === 'fa' ? 'تومان' : 'TMN') : '$';
+
+  // Adaptive font size so numbers NEVER overflow their box
+  let textSizeClass = 'text-sm sm:text-base lg:text-lg';
+  if (size === 'main') {
+    if (fullDisplay.length > 15) {
+      textSizeClass = 'text-xs sm:text-sm lg:text-base';
+    } else if (fullDisplay.length > 11) {
+      textSizeClass = 'text-sm sm:text-base lg:text-lg';
+    } else if (fullDisplay.length > 8) {
+      textSizeClass = 'text-base sm:text-lg lg:text-xl';
+    } else {
+      textSizeClass = 'text-lg sm:text-xl lg:text-2xl';
+    }
+  } else {
+    // sub rows
+    textSizeClass = 'text-[10px] sm:text-[11px]';
+  }
+
+  return (
+    <span 
+      className="inline-flex items-baseline gap-1 min-w-0 max-w-full"
+      title={`${sign}${absNum.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${unit}`}
+    >
+      <span className={`font-mono font-black tracking-tight whitespace-nowrap overflow-hidden text-ellipsis ${textSizeClass} ${colorClass || ''}`}>
+        {isToman ? fullDisplay : `${sign}$${numStr}`}
+      </span>
+      {isToman && (
+        <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0 whitespace-nowrap select-none">
+          {unit}
+        </span>
+      )}
+    </span>
+  );
+};
 
 export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
   const t = translations[lang];
@@ -106,12 +176,14 @@ export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
             </div>
           </div>
 
-          <div className="flex items-baseline gap-2 mb-2 min-w-0">
-            <span className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black tracking-tight font-mono break-all leading-snug ${
-              isNetProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-            }`}>
-              {formatCurrency(activeSummary.totalNetPnL, lang, activeCurrency)}
-            </span>
+          <div className="flex items-baseline gap-2 mb-2 min-w-0 overflow-hidden">
+            <FormattedOverviewAmount
+              amount={activeSummary.totalNetPnL}
+              currency={activeCurrency}
+              lang={lang}
+              colorClass={isNetProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
+              size="main"
+            />
           </div>
 
           <div className="flex items-center justify-between text-[11px] sm:text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -143,21 +215,37 @@ export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
             </div>
           </div>
 
-          <div className="flex items-baseline gap-2 mb-2 min-w-0">
-            <span className="text-base sm:text-lg lg:text-xl xl:text-2xl font-black font-mono text-slate-900 dark:text-slate-100 tracking-tight break-all leading-snug">
-              {formatCurrency(activeSummary.totalFeesPaid, lang, activeCurrency)}
-            </span>
+          <div className="flex items-baseline gap-2 mb-2 min-w-0 overflow-hidden">
+            <FormattedOverviewAmount
+              amount={activeSummary.totalFeesPaid}
+              currency={activeCurrency}
+              lang={lang}
+              colorClass="text-slate-900 dark:text-slate-100"
+              size="main"
+            />
           </div>
 
           {(activeSummary.buyFeesPaid !== undefined || activeSummary.sellFeesPaid !== undefined) && (
-            <div className="flex flex-col gap-1 mb-2 font-mono text-slate-500 dark:text-slate-400 text-[10px] sm:text-[11px] bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between gap-1 text-emerald-600 dark:text-emerald-400">
-                <span className="shrink-0">{t.buyFees}:</span>
-                <span className="font-semibold break-all text-end">{formatCurrency(activeSummary.buyFeesPaid || 0, lang, activeCurrency)}</span>
+            <div className="flex flex-col gap-1.5 mb-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">{t.buyFees}:</span>
+                <FormattedOverviewAmount
+                  amount={activeSummary.buyFeesPaid || 0}
+                  currency={activeCurrency}
+                  lang={lang}
+                  colorClass="text-emerald-600 dark:text-emerald-400 font-semibold"
+                  size="sub"
+                />
               </div>
-              <div className="flex items-center justify-between gap-1 text-rose-500 dark:text-rose-400">
-                <span className="shrink-0">{t.sellFees}:</span>
-                <span className="font-semibold break-all text-end">{formatCurrency(activeSummary.sellFeesPaid || 0, lang, activeCurrency)}</span>
+              <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">{t.sellFees}:</span>
+                <FormattedOverviewAmount
+                  amount={activeSummary.sellFeesPaid || 0}
+                  currency={activeCurrency}
+                  lang={lang}
+                  colorClass="text-rose-500 dark:text-rose-400 font-semibold"
+                  size="sub"
+                />
               </div>
             </div>
           )}
@@ -192,21 +280,25 @@ export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
           </div>
 
           <div className="space-y-1.5 mb-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-            <div className="flex justify-between items-center text-[10px] sm:text-[11px] gap-1">
+            <div className="flex justify-between items-center text-[10px] sm:text-[11px] gap-2 min-w-0">
               <span className="text-slate-500 dark:text-slate-400 shrink-0">{t.realizedPnL}:</span>
-              <span className={`font-mono font-semibold break-all text-end ${
-                activeSummary.realizedPnL >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-              }`}>
-                {formatCurrency(activeSummary.realizedPnL, lang, activeCurrency)}
-              </span>
+              <FormattedOverviewAmount
+                amount={activeSummary.realizedPnL}
+                currency={activeCurrency}
+                lang={lang}
+                colorClass={activeSummary.realizedPnL >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
+                size="sub"
+              />
             </div>
-            <div className="flex justify-between items-center text-[10px] sm:text-[11px] gap-1">
+            <div className="flex justify-between items-center text-[10px] sm:text-[11px] gap-2 min-w-0">
               <span className="text-slate-500 dark:text-slate-400 shrink-0">{t.unrealizedPnL}:</span>
-              <span className={`font-mono font-semibold break-all text-end ${
-                activeSummary.unrealizedPnL >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-              }`}>
-                {formatCurrency(activeSummary.unrealizedPnL, lang, activeCurrency)}
-              </span>
+              <FormattedOverviewAmount
+                amount={activeSummary.unrealizedPnL}
+                currency={activeCurrency}
+                lang={lang}
+                colorClass={activeSummary.unrealizedPnL >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}
+                size="sub"
+              />
             </div>
           </div>
 
@@ -235,21 +327,37 @@ export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
             </div>
           </div>
 
-          <div className="flex items-baseline gap-2 mb-2 min-w-0">
-            <span className="text-base sm:text-lg lg:text-xl xl:text-2xl font-black font-mono text-slate-900 dark:text-slate-100 tracking-tight break-all leading-snug">
-              {formatCurrency(activeSummary.totalBuyValue + activeSummary.totalSellValue, lang, activeCurrency)}
-            </span>
+          <div className="flex items-baseline gap-2 mb-2 min-w-0 overflow-hidden">
+            <FormattedOverviewAmount
+              amount={activeSummary.totalBuyValue + activeSummary.totalSellValue}
+              currency={activeCurrency}
+              lang={lang}
+              colorClass="text-slate-900 dark:text-slate-100"
+              size="main"
+            />
           </div>
 
-          <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-2 border-t border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 gap-1 font-mono">
-            <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 min-w-0">
-              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{formatCurrency(activeSummary.totalBuyValue, lang, activeCurrency)}</span>
-            </span>
-            <span className="flex items-center gap-0.5 text-rose-500 dark:text-rose-400 min-w-0">
-              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{formatCurrency(activeSummary.totalSellValue, lang, activeCurrency)}</span>
-            </span>
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-2 border-t border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 gap-2 font-mono">
+            <div className="flex items-center gap-1 min-w-0">
+              <ArrowDownRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <FormattedOverviewAmount
+                amount={activeSummary.totalBuyValue}
+                currency={activeCurrency}
+                lang={lang}
+                colorClass="text-emerald-600 dark:text-emerald-400"
+                size="sub"
+              />
+            </div>
+            <div className="flex items-center gap-1 min-w-0">
+              <ArrowUpRight className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <FormattedOverviewAmount
+                amount={activeSummary.totalSellValue}
+                currency={activeCurrency}
+                lang={lang}
+                colorClass="text-rose-500 dark:text-rose-400"
+                size="sub"
+              />
+            </div>
           </div>
         </div>
       </div>

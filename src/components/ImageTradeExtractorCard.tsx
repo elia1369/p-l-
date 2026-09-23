@@ -249,6 +249,8 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
         ? symbolsToApply
         : (distinctAssets.length > 0 ? distinctAssets : [assetSymbol]);
 
+      const pendingPriceUpdates: { sym: string; livePriceNum: number; pair: string }[] = [];
+
       setLivePrices(prevPrices => {
         const updatedPrices = { ...prevPrices };
         const updatedMeta = { ...marketMetadata };
@@ -273,10 +275,7 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
             // Auto-fill price field if not manually overridden, or if forceRefresh is true
             if (!manualOverrideFlags[sym] || forceRefresh) {
               updatedPrices[sym] = String(livePriceNum);
-              if (onUpdatePrice) {
-                onUpdatePrice(sym, livePriceNum);
-                onUpdatePrice(`${sym}/${quoteCurrency}`, livePriceNum);
-              }
+              pendingPriceUpdates.push({ sym, livePriceNum, pair: `${sym}/${quoteCurrency}` });
             }
           } else if (!updatedPrices[sym]) {
             // Check if passed in customPrices prop has it
@@ -296,6 +295,16 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
         setMarketMetadata(updatedMeta);
         return updatedPrices;
       });
+
+      // Notify parent safely outside of the setState callback cycle
+      if (onUpdatePrice && pendingPriceUpdates.length > 0) {
+        setTimeout(() => {
+          pendingPriceUpdates.forEach(({ sym, livePriceNum, pair }) => {
+            onUpdatePrice(sym, livePriceNum);
+            onUpdatePrice(pair, livePriceNum);
+          });
+        }, 0);
+      }
     } catch (err: any) {
       console.warn('Failed to fetch Wallex live prices:', err);
       setWallexError(err?.message || (isFa ? 'خطا در ارتباط با وب‌سرویس قیمت لحظه‌ای والکس' : 'Failed to connect to Wallex live price API'));
@@ -546,7 +555,15 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
             mimeType: img.mimeType,
             name: img.name,
           })),
-          userNotes: `Extract all trade rows across all ${targetImages.length} uploaded screenshot(s). Strictly distinguish BUY (خرید) from SELL (فروش) rows. Deduplicate if overlapping pages repeat identical orders. Keep each executed order as a separate row with its exact quantity, side, price, and fee.`,
+          userNotes: `Canonical Iranian exchange (Wallex) 10-column layout:
+From Right to Left (RTL): [۱. بازار] [۲. فروشنده] [۳. خریدار] [۴. قیمت واحد] [۵. مقدار] [۶. قیمت کل] [۷. کارمزد فروشنده (تومان)] [۸. کارمزد خریدار (کوین)] [۹. تاریخ] [۱۰. نوع معامله].
+From Left to Right (LTR): [1. نوع معامله] [2. تاریخ] [3. کارمزد خریدار (کوین)] [4. کارمزد فروشنده (تومان)] [5. قیمت کل] [6. مقدار] [7. قیمت واحد] [8. خریدار] [9. فروشنده] [10. بازار].
+CRITICAL RULES:
+- Even when headers are cut off or not visible, strictly assume this exact 10-column order.
+- Verify: Unit Price * Quantity MUST equal Total Price. Never swap them!
+- For buyer (خرید), user fee is from the Buyer Fee column (in crypto coin).
+- For seller (فروش), user fee is from the Seller Fee column (in TMN quote currency).
+- Deduplicate identical orders across images.`,
         }),
       });
 
@@ -826,6 +843,14 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
     }
   };
 
+  const handleSetAllSide = (side: 'BUY' | 'SELL') => {
+    setExtractedRows(prev => prev.map(r => ({ ...r, side })));
+  };
+
+  const handleToggleAllSides = () => {
+    setExtractedRows(prev => prev.map(r => ({ ...r, side: r.side === 'BUY' ? 'SELL' : 'BUY' })));
+  };
+
   // -------------------------------------------------------------
   // Precise Accounting & Cost Basis Math per Individual Asset
   // Separates BUY and SELL fees:
@@ -1036,6 +1061,18 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
       const curr = r.currency || quoteCurrency;
       const pair = `${sym}/${curr}`;
 
+      const { fee: safeFee, feeUnit: safeUnit } = sanitizeExtractedFee(
+        r.price,
+        r.quantity,
+        r.fee,
+        r.feeUnit,
+        r.side,
+        curr,
+        r.symbol,
+        r.total
+      );
+      const computedFee = safeUnit === 'COIN' ? safeFee * r.price : safeFee;
+
       return {
         id: `ai-extracted-${Date.now()}-${i}`,
         date: r.date || new Date(Date.now() - (extractedRows.length - i) * 3600000).toISOString().replace('T', ' ').substring(0, 19),
@@ -1044,7 +1081,7 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
         side: r.side,
         price: r.price,
         quantity: r.quantity,
-        fee: r.feeUnit === 'COIN' ? r.fee * r.price : r.fee,
+        fee: computedFee,
         total: r.total && r.total > 0 ? r.total : r.price * r.quantity,
         orderId: r.orderId || `ORDER-${i + 1}`,
       };
@@ -2109,6 +2146,47 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
                     {isFa ? 'نمایش تمام سطرها' : 'Show all rows'}
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Canonical Wallex Columns Reference Banner & Quick Side Switch */}
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[11px] flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-indigo-700 dark:text-indigo-300">
+                  {isFa ? 'ترتیب ستون‌ها (مطابق سرستون رسمی والکس):' : 'Standard Wallex Column Order (RTL):'}
+                </span>
+                <span className="text-slate-600 dark:text-slate-300 font-sans text-[10px] sm:text-[11px]">
+                  {isFa 
+                    ? '۱. بازار | ۲. فروشنده | ۳. خریدار | ۴. قیمت واحد | ۵. مقدار | ۶. قیمت کل | ۷. کارمزد فروشنده (تومان) | ۸. کارمزد خریدار (کوین) | ۹. تاریخ | ۱۰. نوع معامله'
+                    : '1. Market | 2. Seller | 3. Buyer | 4. Unit Price | 5. Qty | 6. Total | 7. Seller Fee (TMN) | 8. Buyer Fee (Coin) | 9. Date | 10. Type'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => handleSetAllSide('BUY')}
+                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 transition cursor-pointer"
+                  title={isFa ? 'تنظیم نوع تمام سطرها به خرید' : 'Set all rows to BUY'}
+                >
+                  {isFa ? 'همه: خرید 🟢' : 'All: BUY 🟢'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetAllSide('SELL')}
+                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition cursor-pointer"
+                  title={isFa ? 'تنظیم نوع تمام سطرها به فروش' : 'Set all rows to SELL'}
+                >
+                  {isFa ? 'همه: فروش 🔴' : 'All: SELL 🔴'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleAllSides}
+                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition cursor-pointer"
+                  title={isFa ? 'معکوس کردن خرید و فروش در تمام سطرها' : 'Invert BUY and SELL for all rows'}
+                >
+                  {isFa ? 'معکوس کردن ⇄' : 'Invert ⇄'}
+                </button>
               </div>
             </div>
 

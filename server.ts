@@ -123,7 +123,7 @@ app.post("/api/extract-trades-from-image", async (req, res) => {
 
     const promptText = `
 You are an expert financial and cryptocurrency trade auditor and OCR vision model.
-Carefully inspect the uploaded ${isMultiple ? `${count} screenshots of trade order history tables or exchange transaction reports` : "screenshot of a trade order history table"} (from exchanges like Wallex, Nobitex, Tabdeal, Binance, KuCoin, BingX, etc.).
+Carefully inspect the uploaded ${isMultiple ? `${count} screenshots of trade order history tables or exchange transaction reports` : "screenshot of a trade order history table"} (from Iranian exchanges like Wallex, Nobitex, Tabdeal, or international exchanges like Binance, KuCoin).
 
 ${isMultiple ? `
 MULTI-SCREENSHOT PROCESSING INSTRUCTIONS:
@@ -133,55 +133,70 @@ MULTI-SCREENSHOT PROCESSING INSTRUCTIONS:
 - Combine all unique trade orders across all images into a single consolidated list.
 ` : ""}
 
-CRITICAL REQUIREMENT - MULTI-CURRENCY & BUY/SELL SIDES:
-The screenshot(s) may contain trades for MULTIPLE DIFFERENT CRYPTOCURRENCIES / TOKENS (e.g. ARB, BTC, ETH, TON, ICP, SOL, SHIB, DOGE, AVAX, GALA, DOGS, POL, IBBABYDOGE, PUMP, USOON, CELR, XRP, etc.) AND both BUY (خرید) and SELL (فروش) transactions!
-You MUST inspect each row independently and identify:
-1. The EXACT cryptocurrency symbol for EACH individual trade row (e.g., ARB, BTC, ETH, AVAX, SOL, GALA).
-2. The EXACT trade SIDE ("BUY" for خرید / سبز, or "SELL" for فروش / قرمز).
-DO NOT group, sum, or lump different coins or BUY and SELL together! Each row must preserve its exact original quantity, price, and side.
+========================================================================================
+CANONICAL COLUMN SPECIFICATION (DEFAULT FOR ALL IMAGES EVEN IF HEADERS ARE CUT OFF):
+The screenshot(s) are from Iranian crypto exchanges (specifically Wallex transaction history).
+Even when the table header is scrolled past, cropped, or not visible, the 10 COLUMNS ALWAYS strictly follow this exact order:
 
-CRITICAL INSTRUCTIONS FOR IRANIAN EXCHANGE TABLES (WALLEX, NOBITEX, ETC.) WITH SELLER (فروشنده) AND BUYER (خریدار) COLUMNS:
-In matched trade execution reports (like Wallex), tables often show TWO parties and TWO separate fee columns:
-Columns: [بازار / Market] [فروشنده / Seller] [خریدار / Buyer] [قیمت واحد / Unit Price] [مقدار / Quantity] [قیمت کل / Total] [کارمزد فروشنده / Seller Fee] [کارمزد خریدار / Buyer Fee]
-1. IDENTIFYING THE ACCOUNT OWNER:
-   - The user whose transaction report this is appears consistently across EVERY trade row (e.g., "پرهام قاضی زاده").
-   - The counterparty is another person or robot (e.g., "MMRobot Multi2", "MMRobot Multi3", "External H builder", etc.).
+When reading from RIGHT to LEFT (Standard Persian RTL layout):
+- Column 1 (Rightmost): بازار (Market / Trading Pair) -> e.g. "AVAXTMN", "BTCTMN", "USDTIRR"
+- Column 2: فروشنده (Seller Name) -> e.g. "سیدعلیرضا ناظم زاده" or "MMRobot"
+- Column 3: خریدار (Buyer Name) -> e.g. "محمد کریمی رزکانی" or "MMRobot"
+- Column 4: قیمت واحد (Unit Price) -> Single unit price in TMN (e.g. 2,505,366) or USDT
+- Column 5: مقدار (Quantity / Volume) -> Number of crypto coins traded (e.g. 30, 43.19026)
+- Column 6: قیمت کل (Total Price / Total Value) -> Total trade value = Unit Price * Quantity (e.g. 75,160,980, 108,226,628)
+- Column 7: کارمزد فروشنده (Seller Fee) -> Paid in TMN / Quote currency, e.g. "37,580 (TMN)" or "54,113 (TMN)"
+- Column 8: کارمزد خریدار (Buyer Fee) -> Paid in Crypto Coin, e.g. "0.036 (AVAX)" or "0.05182831 (AVAX)"
+- Column 9: تاریخ (Date & Time) -> e.g. "14:40 - 1405/06/31"
+- Column 10 (Leftmost): نوع معامله (Transaction Type) -> e.g. "EXCHANGE"
 
-2. SELECTING THE CORRECT SIDE AND THE CORRECT FEE:
-   - When the user's name is in the "خریدار" (Buyer) column:
+When reading from LEFT to RIGHT:
+- Column 1 (Leftmost): نوع معامله (Transaction Type e.g. "EXCHANGE")
+- Column 2: تاریخ (Date & Time e.g. "14:40 - 1405/06/31")
+- Column 3: کارمزد خریدار (Buyer Fee in base coin e.g. 0.036 AVAX)
+- Column 4: کارمزد فروشنده (Seller Fee in TMN e.g. 37,580 TMN)
+- Column 5: قیمت کل (Total Price e.g. 75,160,980)
+- Column 6: مقدار (Quantity of crypto e.g. 30)
+- Column 7: قیمت واحد (Unit Price e.g. 2,505,366)
+- Column 8: خریدار (Buyer Name)
+- Column 9: فروشنده (Seller Name)
+- Column 10 (Rightmost): بازار (Market e.g. "AVAXTMN")
+========================================================================================
+
+CRITICAL RULES FOR DETERMINING BUY vs SELL SIDE & THE CORRECT FEE:
+1. IDENTIFYING ACCOUNT OWNER & TRADE SIDE:
+   - Identify the user whose account this ledger belongs to (the recurring personal name across trade rows, e.g., "سیدعلیرضا ناظم زاده").
+   - If the user is in the "خریدار" (Buyer) column (Col 3 RTL / Col 8 LTR):
      * side = "BUY"
-     * fee: YOU MUST EXTRACT THE FEE FROM THE "کارمزد خریدار" (Buyer Fee) COLUMN ONLY! DO NOT TAKE THE SELLER FEE!
-     * feeUnit: Look at the unit in parentheses inside the "کارمزد خریدار" cell:
-       - E.g. "0.00078888 (AVAX)" -> fee: 0.00078888, feeUnit: "COIN"
-       - E.g. "0.01039694 (SOL)" -> fee: 0.01039694, feeUnit: "COIN"
-       - E.g. "0 (USDT)" -> fee: 0, feeUnit: "CURRENCY"
-   - When the user's name is in the "فروشنده" (Seller) column:
+     * fee: Extract ONLY from the "کارمزد خریدار" (Buyer Fee) column (Col 8 RTL / Col 3 LTR).
+     * feeUnit: "COIN" (because buyer pays fee in the bought crypto coin, e.g. 0.036 AVAX).
+   - If the user is in the "فروشنده" (Seller) column (Col 2 RTL / Col 9 LTR):
      * side = "SELL"
-     * fee: YOU MUST EXTRACT THE FEE FROM THE "کارمزد فروشنده" (Seller Fee) COLUMN ONLY! DO NOT TAKE THE BUYER FEE!
-     * feeUnit: Look at the unit in parentheses inside the "کارمزد فروشنده" cell:
-       - E.g. "4,001 (TMN)" -> fee: 4001, feeUnit: "CURRENCY" (because TMN is Toman / quote currency!).
-       - E.g. "74,608 (TMN)" -> fee: 74608, feeUnit: "CURRENCY".
-       - E.g. "161,490 (TMN)" -> fee: 161490, feeUnit: "CURRENCY".
-       - E.g. "0.15616013 (USDT)" -> fee: 0.15616013, feeUnit: "CURRENCY".
-       - WARNING: NEVER mark "4,001 (TMN)" as "COIN"! 4,001 is Tomans, NOT coins! If you mark 4,001 as COIN, multiplying 4,001 by unit price 2,500,000 gives 10 Billion Toman fee which is a catastrophic mistake!
+     * fee: Extract ONLY from the "کارمزد فروشنده" (Seller Fee) column (Col 7 RTL / Col 4 LTR).
+     * feeUnit: "CURRENCY" (because seller pays fee in TMN/quote currency, e.g. 37,580 TMN).
 
-3. FEE SANITY AND VALUE BOUNDS:
-   - On cryptocurrency exchanges, the fee is ALWAYS between 0.05% and 0.4% of the total turnover (1/500th to 1/1000th of trade value).
-   - A transaction fee CAN NEVER exceed the total price or turnover of the trade!
-   - If unit price is 2,535,945 TMN and total price is 2,000,556 TMN:
-     * The fee in TMN is 4,001 TMN (~0.2%).
-     * The fee in coins is 0.00078888 AVAX (~0.1%).
+2. MATHEMATICAL VERIFICATION (PREVENT SWAPPING):
+   - ALWAYS verify: Unit Price * Quantity ≈ Total Price!
+     Example: 2,505,366 (price) * 30 (qty) = 75,160,980 (total).
+     NEVER swap Total Price with Unit Price!
+   - Seller Fee is ~0.05% - 0.25% of Total Price (in TMN, e.g. 37,580).
+   - Buyer Fee is ~0.05% - 0.25% of Quantity (in coins, e.g. 0.036 AVAX).
+   - NEVER assign a 37,580 Toman fee as "COIN" units!
 
 Your task is to extract all trade rows accurately across all images:
 1. For EACH individual trade row, identify:
    - "symbol": Base coin symbol (e.g., "BTC", "ETH", "AVAX", "SOL", "GALA", "ARB", "SHIB"). Convert to standard uppercase letters.
    - "side": "BUY" or "SELL".
    - "currency": "TMN" for تومان / Toman, "USD" for Tether / USDT / $.
-   - "price": Unit price per coin. Convert Persian digits (۰-۹) and remove thousand commas.
-   - "quantity": Number of coins traded.
+   - "price": Unit price per coin (قیمت واحد).
+   - "quantity": Number of coins traded (مقدار).
+   - "total": The total turnover/spend amount (قیمت کل = Unit Price * Quantity).
    - "fee": Transaction fee amount paid by the user for their side of the order.
    - "feeUnit": "COIN" if fee is in cryptocurrency asset, or "CURRENCY" if fee is in quote currency (TMN / USDT).
-   - "total": The total turnover/spend amount if explicitly shown on that row.
+   - "sellerFee": Numeric fee value from the Seller Fee column if visible.
+   - "buyerFee": Numeric fee value from the Buyer Fee column if visible.
+   - "sellerName": Seller person/entity name if visible.
+   - "buyerName": Buyer person/entity name if visible.
    - "date": Date and time string if visible.
    - "orderId": Order ID or tracking number if visible.
 
@@ -288,6 +303,22 @@ Precision rules:
                 type: Type.STRING,
                 description: "Order number or transaction ID",
               },
+              sellerName: {
+                type: Type.STRING,
+                description: "Seller person/entity name from Column 2 (or Col 9 from left)",
+              },
+              buyerName: {
+                type: Type.STRING,
+                description: "Buyer person/entity name from Column 3 (or Col 8 from left)",
+              },
+              sellerFee: {
+                type: Type.NUMBER,
+                description: "Seller fee from Column 7 (TMN/quote currency fee)",
+              },
+              buyerFee: {
+                type: Type.NUMBER,
+                description: "Buyer fee from Column 8 (crypto coin fee)",
+              },
             },
             required: ["symbol", "price", "quantity", "fee", "side"],
           },
@@ -357,14 +388,28 @@ Precision rules:
       const singlePrompt = `
 You are an expert financial and cryptocurrency trade auditor and OCR vision model.
 Extract all trade rows from this single exchange order history screenshot accurately.
-Identify:
-1. Cryptocurrency base symbol (e.g., BTC, ETH, AVAX, SOL, GALA, ARB, SHIB, POL, DOGS, etc.).
-2. Trade side (BUY or SELL): Look at user's position in matched table (Buyer = BUY, Seller = SELL).
-3. Quote currency: TMN (تومان) or USD/USDT.
-4. Unit price, volume quantity, and fee:
-   - For Buyer trades (خرید): extract fee from "کارمزد خریدار" (Buyer Fee).
-   - For Seller trades (فروش): extract fee from "کارمزد فروشنده" (Seller Fee). If fee has "(TMN)", it is in Toman (CURRENCY).
-   - Exchange fees are strictly around 0.05% to 0.4% of trade value. Never mark a Toman fee (e.g. 4,001 TMN) as "COIN"!
+
+CANONICAL 10-COLUMN ORDER (DEFAULT FOR ALL IMAGES EVEN IF HEADERS ARE CUT OFF):
+From RIGHT to LEFT (Standard Iranian exchange / Wallex table):
+1. بازار (Market) -> e.g. "AVAXTMN", "BTCTMN"
+2. فروشنده (Seller Name)
+3. خریدار (Buyer Name)
+4. قیمت واحد (Unit Price) -> Single coin price
+5. مقدار (Quantity) -> Crypto volume
+6. قیمت کل (Total Price) -> Total = Unit Price * Quantity
+7. کارمزد فروشنده (Seller Fee) -> in TMN (~0.05% - 0.25% of Total)
+8. کارمزد خریدار (Buyer Fee) -> in Crypto Coin (~0.05% - 0.25% of Quantity)
+9. تاریخ (Date & Time)
+10. نوع معامله (Trade Type e.g. EXCHANGE)
+
+From LEFT to RIGHT:
+[نوع معامله] [تاریخ] [کارمزد خریدار (کوین)] [کارمزد فروشنده (تومان)] [قیمت کل] [مقدار] [قیمت واحد] [خریدار] [فروشنده] [بازار]
+
+RULES:
+- When user is in "خریدار" (Buyer): side = "BUY", user's fee is from "کارمزد خریدار" (COIN fee).
+- When user is in "فروشنده" (Seller): side = "SELL", user's fee is from "کارمزد فروشنده" (TMN / CURRENCY fee).
+- Mathematical verification: Unit Price * Quantity MUST equal Total Price.
+- Never mark a 37,580 Toman fee as "COIN"!
 Return structured JSON matching the schema.
 `;
       const accumulatedTrades: any[] = [];
@@ -438,7 +483,35 @@ Return structured JSON matching the schema.
     const primarySym = (parsedData.detectedSymbol || "CRYPTO").toUpperCase().replace(/[^A-Z0-9]/g, "") || "CRYPTO";
     const primaryCurr = (parsedData.detectedCurrency || "TMN").toUpperCase().includes("USD") ? "USD" : "TMN";
 
-    const normalizedTrades = (parsedData.trades || []).map((t: any) => {
+    // Analyze recurring names across all extracted trades to identify the account owner
+    const rawTradesList = Array.isArray(parsedData.trades) ? parsedData.trades : [];
+    const nameCounts: Record<string, { asSeller: number; asBuyer: number }> = {};
+    for (const t of rawTradesList) {
+      const sName = String(t.sellerName || "").trim();
+      const bName = String(t.buyerName || "").trim();
+      const isSystemBot = (n: string) => /robot|mmrobot|external|market\s*maker|system/i.test(n);
+
+      if (sName && !isSystemBot(sName)) {
+        if (!nameCounts[sName]) nameCounts[sName] = { asSeller: 0, asBuyer: 0 };
+        nameCounts[sName].asSeller += 1;
+      }
+      if (bName && !isSystemBot(bName)) {
+        if (!nameCounts[bName]) nameCounts[bName] = { asSeller: 0, asBuyer: 0 };
+        nameCounts[bName].asBuyer += 1;
+      }
+    }
+
+    let dominantUser: string | null = null;
+    let maxUserRows = 0;
+    for (const [name, stats] of Object.entries(nameCounts)) {
+      const tot = stats.asSeller + stats.asBuyer;
+      if (tot > maxUserRows) {
+        maxUserRows = tot;
+        dominantUser = name;
+      }
+    }
+
+    const normalizedTrades = rawTradesList.map((t: any) => {
       let sym = t.symbol ? String(t.symbol).toUpperCase().replace(/[^A-Z0-9]/g, "") : primarySym;
       if (!sym) sym = primarySym;
       
@@ -448,14 +521,49 @@ Return structured JSON matching the schema.
         curr = c.includes("USD") || c.includes("USDT") || c === "$" ? "USD" : "TMN";
       }
 
-      const p = Number(t.price) || 0;
-      const q = Number(t.quantity) || 0;
+      let p = Number(t.price) || 0;
+      let q = Number(t.quantity) || 0;
+      let totalVal = t.total && Number(t.total) > 0 ? Number(t.total) : 0;
+      const sellerFee = Number(t.sellerFee) || 0;
+      const buyerFee = Number(t.buyerFee) || 0;
       let rawFee = Number(t.fee) || 0;
-      const totalVal = t.total && Number(t.total) > 0 ? Number(t.total) : p * q;
       const rawUnit = String(t.feeUnit || "").trim().toUpperCase();
 
+      // CANONICAL COLUMN MATHEMATICAL CHECK (Col 4 Unit Price, Col 5 Quantity, Col 6 Total Price):
+      // Unit Price * Quantity MUST equal Total Price!
+      // If OCR inverted Unit Price and Total Price (e.g. 75,160,980 as price and 2,505,366 as total):
+      if (p > 0 && q > 0) {
+        if (totalVal > 0) {
+          const prodPQ = p * q;
+          const prodTotalQ = totalVal * q;
+          // Check if totalVal * q equals p (meaning they were swapped)
+          if (p > totalVal && Math.abs(prodTotalQ - p) < Math.max(p, totalVal) * 0.05 && Math.abs(prodPQ - totalVal) > Math.max(p, totalVal) * 0.1) {
+            const swap = p;
+            p = totalVal;
+            totalVal = swap;
+          }
+        } else {
+          totalVal = p * q;
+        }
+      } else if (p === 0 && totalVal > 0 && q > 0) {
+        p = totalVal / q;
+      } else if (q === 0 && totalVal > 0 && p > 0) {
+        q = totalVal / p;
+      }
+
+      // DETERMINE SIDE: Check if account owner is Seller or Buyer
+      let determinedSide: "BUY" | "SELL" = (t.side?.toUpperCase() === "SELL" ? "SELL" : "BUY");
+      const currentSeller = String(t.sellerName || "").trim();
+      const currentBuyer = String(t.buyerName || "").trim();
+      if (dominantUser) {
+        if (currentSeller === dominantUser) {
+          determinedSide = "SELL";
+        } else if (currentBuyer === dominantUser) {
+          determinedSide = "BUY";
+        }
+      }
+
       // Robust feeUnit identification:
-      // If the unit string indicates a fiat/quote currency (TMN, TOMAN, تومان, USDT, USD, IRR, etc.), fee is in CURRENCY
       const isExplicitCurrencyUnit =
         rawUnit === "CURRENCY" ||
         rawUnit === "TMN" ||
@@ -474,50 +582,61 @@ Return structured JSON matching the schema.
         rawUnit === "BASE";
 
       let cleanFeeUnit: "COIN" | "CURRENCY";
-      if (isExplicitCurrencyUnit) {
+
+      // DETERMINE FEE ACCORDING TO CANONICAL IRANIAN EXCHANGE (WALLEX) COLUMNS:
+      // Column 7: Seller Fee (always in TMN / Quote currency)
+      // Column 8: Buyer Fee (always in Crypto Coin)
+      if (determinedSide === "SELL") {
         cleanFeeUnit = "CURRENCY";
-      } else if (isExplicitCoinUnit) {
-        cleanFeeUnit = "COIN";
+        if (sellerFee > 0) {
+          rawFee = sellerFee;
+        } else if (isExplicitCurrencyUnit && rawFee > 0) {
+          // already currency
+        } else if (buyerFee > 0 && rawFee === buyerFee && totalVal > 0) {
+          // Model mistakenly picked buyer coin fee for seller!
+          rawFee = sellerFee > 0 ? sellerFee : totalVal * 0.0005; // 0.05% typical seller fee
+        }
       } else {
-        // Infer from values or default side convention
-        if (totalVal > 0 && p > 0) {
-          if (rawFee * p > totalVal * 0.1 && rawFee <= totalVal * 0.05) {
-            cleanFeeUnit = "CURRENCY";
-          } else if (q > 0 && rawFee <= q * 0.05) {
-            cleanFeeUnit = "COIN";
+        // BUY side
+        cleanFeeUnit = "COIN";
+        if (buyerFee > 0) {
+          rawFee = buyerFee;
+        } else if (isExplicitCoinUnit && rawFee > 0) {
+          // already coin
+        } else if (sellerFee > 0 && rawFee === sellerFee && q > 0) {
+          // Model mistakenly picked seller TMN fee (e.g. 37,580 TMN) for buyer of 30 AVAX!
+          rawFee = buyerFee > 0 ? buyerFee : q * 0.0012; // 0.12% typical buyer coin fee
+        } else if (rawFee > 100 && q > 0 && rawFee > q * 0.1) {
+          // Large integer fee on a coin quantity is clearly a Toman quote fee!
+          if (buyerFee > 0) {
+            rawFee = buyerFee;
           } else {
-            cleanFeeUnit = t.side?.toUpperCase() === "SELL" ? "CURRENCY" : "COIN";
+            rawFee = q * 0.0012;
           }
-        } else {
-          cleanFeeUnit = t.side?.toUpperCase() === "SELL" ? "CURRENCY" : "COIN";
         }
       }
 
       // Mathematical Guard Rail & Sanity Check:
-      // Exchange fees are ALWAYS 0.05% to 0.4% (max 1%).
+      // Exchange fees are ALWAYS between 0.05% and 0.4% (max 1%).
       if (totalVal > 0 && p > 0 && rawFee > 0) {
         if (cleanFeeUnit === "COIN") {
           const feeInQuoteCurrency = rawFee * p;
-          // If fee multiplied by price is > 10% of total trade turnover or fee > 10% of volume:
-          if (feeInQuoteCurrency > totalVal * 0.1 || (q > 0 && rawFee > q * 0.1)) {
-            // Check if rawFee itself was already in quote currency (e.g. 4001 TMN on 2,000,556 TMN trade)
+          if (feeInQuoteCurrency > totalVal * 0.05 || (q > 0 && rawFee > q * 0.05)) {
+            // Check if rawFee was in Toman currency:
             if (rawFee <= totalVal * 0.05) {
               cleanFeeUnit = "CURRENCY";
             } else if (q > 0 && (rawFee / p) <= q * 0.05) {
               rawFee = rawFee / p;
             } else {
-              // Safety fallback: 0.2% standard exchange fee in coin
-              rawFee = q * 0.002;
+              rawFee = q * 0.0012;
             }
           }
         } else if (cleanFeeUnit === "CURRENCY") {
-          // If fee in quote currency > 10% of trade turnover:
-          if (rawFee > totalVal * 0.1) {
+          if (rawFee > totalVal * 0.05) {
             if (rawFee * p <= totalVal * 0.05) {
               cleanFeeUnit = "COIN";
             } else {
-              // Safety fallback: 0.2% standard exchange fee in quote currency
-              rawFee = totalVal * 0.002;
+              rawFee = totalVal * 0.0005;
             }
           }
         }
@@ -531,7 +650,7 @@ Return structured JSON matching the schema.
         quantity: q,
         fee: rawFee,
         feeUnit: cleanFeeUnit,
-        side: (t.side?.toUpperCase() === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL",
+        side: determinedSide,
         total: totalVal > 0 ? totalVal : undefined,
       };
     });
