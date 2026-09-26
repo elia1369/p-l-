@@ -24,7 +24,8 @@ import {
   exportPnLReportToExcel 
 } from './utils/excelParser';
 import { translations } from './utils/i18n';
-import { ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2 } from 'lucide-react';
+import bgWallpaper from './assets/images/crypto_fintech_bg_1790403820718.jpg';
 
 export default function App() {
   // 1. Core State
@@ -124,10 +125,13 @@ export default function App() {
 
   // 6. Real-time Market Price Update
   const handleUpdatePrice = (symbol: string, newPrice: number) => {
-    setCustomPrices(prev => ({
-      ...prev,
-      [symbol]: newPrice,
-    }));
+    setCustomPrices(prev => {
+      if (prev[symbol] === newPrice) return prev;
+      return {
+        ...prev,
+        [symbol]: newPrice,
+      };
+    });
   };
 
   // 7. Manual Trade Operations
@@ -185,43 +189,43 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200"
+      className="relative min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden selection:bg-emerald-500/20 selection:text-emerald-400"
       dir={lang === 'fa' ? 'rtl' : 'ltr'}
     >
+      {/* Ambient Visual Background with Generated Fintech Wallpaper */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        <img 
+          src={bgWallpaper}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover object-top opacity-20 dark:opacity-30 filter blur-[0.5px] scale-100 transition-opacity duration-700"
+        />
+        {/* Subtle mesh gradients for premium depth */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-50/85 via-slate-50/92 to-slate-50 dark:from-slate-950/80 dark:via-slate-950/92 dark:to-slate-950" />
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-br from-emerald-500/10 via-cyan-500/10 to-indigo-500/0 rounded-full blur-3xl pointer-events-none" />
+      </div>
+
       {/* Navigation Bar */}
-      <Navbar
-        lang={lang}
-        onToggleLang={toggleLanguage}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onOpenPiiModal={() => setIsPiiModalOpen(true)}
-        piiReport={piiReport}
-        onLoadDemo={handleLoadDemo}
-        onClear={handleClearData}
-        hasTrades={trades.length > 0}
-        onExportExcel={handleExportExcel}
-      />
+      <div className="relative z-20">
+        <Navbar
+          lang={lang}
+          onToggleLang={toggleLanguage}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onOpenPiiModal={() => setIsPiiModalOpen(true)}
+          piiReport={piiReport}
+          onLoadDemo={handleLoadDemo}
+          onClear={handleClearData}
+          hasTrades={trades.length > 0}
+          onExportExcel={handleExportExcel}
+        />
+      </div>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 sm:space-y-8">
-        {/* PII Privacy Shield Notification Banner */}
-        <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs sm:text-sm">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="font-medium leading-relaxed">
-              {lang === 'fa' 
-                ? 'امنیت PII تضمین شده: کلیه پردازش‌های فایل اکسل بدون ذخیره‌سازی، به صورت ۱۰۰٪ محلی در مرورگر شما انجام می‌شود.' 
-                : 'Guaranteed PII Security: Excel analysis is performed 100% locally in your browser with zero server persistence.'}
-            </span>
-          </div>
-          <button
-            onClick={() => setIsPiiModalOpen(true)}
-            className="text-xs font-bold underline hover:opacity-80 shrink-0 px-2 py-1 cursor-pointer"
-          >
-            {lang === 'fa' ? 'مشاهده گزارش امنیتی' : 'View Security Report'}
-          </button>
-        </div>
-
+      <main className="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 sm:space-y-8">
         {/* Upload & Drag-Drop Area with Current Price P&L Calculator */}
         <FileUploadArea
           lang={lang}
@@ -273,7 +277,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+      <footer className="relative z-10 mt-12 border-t border-slate-200/80 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xs">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>{t.appTitle} - {t.privacyGuaranteed}</span>
           <span>{t.disclaimer}</span>

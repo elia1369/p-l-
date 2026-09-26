@@ -214,11 +214,12 @@ Precision rules:
 
     // Candidate models in priority order. Active and healthy multimodal vision models first
     const CANDIDATE_MODELS = [
-      "gemini-3-flash-preview",
-      "gemini-3.7-flash",
       "gemini-3.8-flash",
       "gemini-flash-latest",
       "gemini-3.1-flash-lite",
+      "gemini-3.1-pro-preview",
+      "gemini-3.7-flash",
+      "gemini-3-flash-preview",
       "gemini-3.1-flash-lite-preview",
       "gemini-flash-lite-latest",
     ];
@@ -348,7 +349,12 @@ Precision rules:
         } catch (err: any) {
           mErr = err;
           const msg = err?.message || String(err || "");
-          const isTransient = msg.includes("503") || msg.includes("high demand") || msg.includes("429") || msg.includes("UNAVAILABLE");
+          const isQuota = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Quota exceeded");
+          if (isQuota) {
+            // Immediate break to failover to the next candidate model without wasting time on exhausted quota
+            break;
+          }
+          const isTransient = msg.includes("503") || msg.includes("high demand") || msg.includes("UNAVAILABLE");
           if (isTransient && attempt < maxModelRetries) {
             console.warn(`Transient error on ${modelName} (attempt ${attempt}/${maxModelRetries}). Retrying in ${attempt * 800}ms...`);
             await new Promise((resolve) => setTimeout(resolve, attempt * 800));

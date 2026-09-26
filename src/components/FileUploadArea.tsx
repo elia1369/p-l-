@@ -89,24 +89,20 @@ export const FileUploadArea: React.FC<Props> = ({
   return (
     <div className="w-full space-y-4">
       {/* Top Method Switcher: Excel Upload vs AI Image OCR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 pb-3">
+        <div className="inline-flex p-1 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <button
             id="tab-image-ocr"
             type="button"
             onClick={() => setActiveTab('IMAGE_OCR')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeTab === 'IMAGE_OCR'
-                ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/30'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <Camera className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <Camera className="w-4 h-4" />
             <span>{t.tabManualInput}</span>
-            <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300">
-              <Sparkles className="w-3 h-3" />
-              <span>{t.tabManualBadge}</span>
-            </span>
           </button>
 
           <button
@@ -115,21 +111,14 @@ export const FileUploadArea: React.FC<Props> = ({
             onClick={() => setActiveTab('EXCEL')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeTab === 'EXCEL'
-                ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <FileSpreadsheet className="w-4 h-4" />
             <span>{t.tabExcelUpload}</span>
           </button>
         </div>
-
-        {/* Quick helper note */}
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          {activeTab === 'IMAGE_OCR'
-            ? (lang === 'fa' ? 'آپلود اسکرین‌شات از صرافی یا فشردن Ctrl+V برای استخراج خودکار قیمت و کارمزدها' : 'Upload screenshot or press Ctrl+V for auto extraction')
-            : (lang === 'fa' ? 'محاسبه خودکار از تمام سطرهای فایل اکسل' : 'Auto-analysis from Excel trade rows')}
-        </span>
       </div>
 
       {activeTab === 'EXCEL' ? (
@@ -148,25 +137,23 @@ export const FileUploadArea: React.FC<Props> = ({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer ${
+            className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer backdrop-blur-md ${
               isDragging
-                ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 scale-[1.008]'
-                : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500/70 bg-white dark:bg-slate-900/60 shadow-xs'
+                ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 scale-[1.008]'
+                : 'border-emerald-500/30 dark:border-emerald-500/20 hover:border-emerald-500/60 bg-white/70 dark:bg-slate-900/60 shadow-xs'
             }`}
           >
             <div className="flex flex-col items-center justify-center max-w-lg mx-auto">
               {/* Main Icon */}
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 transition-transform group-hover:scale-105">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 dark:from-emerald-500/25 dark:to-teal-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 transition-transform group-hover:scale-105 shadow-sm shadow-emerald-500/10">
                 <UploadCloud className="w-8 h-8" />
               </div>
 
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">
-                {fileName ? `${t.fileLoaded}: ${fileName}` : t.uploadTitle}
-              </h3>
-
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed max-w-md">
-                {t.uploadDesc}
-              </p>
+              {fileName && (
+                <div className="mb-4 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-xs font-bold border border-emerald-200 dark:border-emerald-800">
+                  {t.fileLoaded}: {fileName}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
@@ -182,17 +169,6 @@ export const FileUploadArea: React.FC<Props> = ({
                 </button>
 
                 <button
-                  id="load-demo-btn"
-                  type="button"
-                  onClick={onLoadDemo}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>{t.loadDemoBtn}</span>
-                </button>
-
-                <button
                   id="download-template-btn"
                   type="button"
                   onClick={downloadExcelTemplate}
@@ -201,12 +177,6 @@ export const FileUploadArea: React.FC<Props> = ({
                   <Download className="w-4 h-4" />
                   <span>{t.downloadTemplateBtn}</span>
                 </button>
-              </div>
-
-              {/* Privacy Security Note */}
-              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs border border-emerald-500/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>{t.privacyGuaranteed}</span>
               </div>
             </div>
 

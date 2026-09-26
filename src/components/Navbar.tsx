@@ -1,7 +1,6 @@
 import React from 'react';
 import { 
   TrendingUp, 
-  ShieldCheck, 
   Sun, 
   Moon, 
   Languages, 
@@ -41,7 +40,7 @@ export const Navbar: React.FC<Props> = ({
   const t = translations[lang];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl transition-colors shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Left: Logo & Title */}
         <div className="flex items-center gap-3">
@@ -53,9 +52,6 @@ export const Navbar: React.FC<Props> = ({
               <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-50 tracking-tight">
                 {t.appTitle}
               </h1>
-              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                P&L Engine v2.0
-              </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate max-w-sm md:max-w-md">
               {t.privacyGuaranteed}
@@ -65,21 +61,6 @@ export const Navbar: React.FC<Props> = ({
 
         {/* Right: Controls & Badges */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* PII Privacy Shield Button */}
-          <button
-            id="pii-shield-status-btn"
-            onClick={onOpenPiiModal}
-            title={t.piiBadge}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition cursor-pointer"
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">{t.piiBadge}</span>
-            <span className="sm:hidden">PII</span>
-            {piiReport && piiReport.columnsSanitized.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            )}
-          </button>
-
           {/* Template Download */}
           <button
             id="download-template-nav-btn"

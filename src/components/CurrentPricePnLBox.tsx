@@ -219,24 +219,18 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
   return (
     <div 
       id="current-price-pnl-card"
-      className="mt-5 rounded-2xl border border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-500/5 via-white to-white dark:via-slate-900 dark:to-slate-900 p-4 sm:p-6 shadow-xs transition-all"
+      className="mt-5 rounded-2xl border border-emerald-500/25 dark:border-emerald-500/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-6 shadow-lg shadow-emerald-950/5 transition-all"
     >
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+          <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/15 text-emerald-600 dark:text-emerald-400 shadow-xs shadow-emerald-500/10">
             <Calculator className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span>{t.calcBoxTitle}</span>
-              <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                {t.autoCalculatedFromExcel}
-              </span>
+            <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100">
+              {t.calcBoxTitle}
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {t.calcBoxDesc}
-            </p>
           </div>
         </div>
 

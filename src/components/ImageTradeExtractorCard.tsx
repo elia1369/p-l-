@@ -250,51 +250,52 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
         : (distinctAssets.length > 0 ? distinctAssets : [assetSymbol]);
 
       const pendingPriceUpdates: { sym: string; livePriceNum: number; pair: string }[] = [];
+      const newMeta: Record<string, any> = {};
+      const newPrices: Record<string, string> = {};
 
-      setLivePrices(prevPrices => {
-        const updatedPrices = { ...prevPrices };
-        const updatedMeta = { ...marketMetadata };
+      symbols.forEach(rawSym => {
+        const sym = (rawSym || '').trim().toUpperCase();
+        if (!sym) return;
 
-        symbols.forEach(rawSym => {
-          const sym = (rawSym || '').trim().toUpperCase();
-          if (!sym) return;
+        const matched = findWallexMarket(markets, sym, quoteCurrency);
+        const livePriceNum = matched ? parseFloat(matched.price) : 0;
 
-          const matched = findWallexMarket(markets, sym, quoteCurrency);
-          const livePriceNum = matched ? parseFloat(matched.price) : 0;
+        if (matched && livePriceNum > 0) {
+          newMeta[sym] = {
+            price: livePriceNum,
+            change24h: matched.change_24h,
+            highest24h: matched.highest_24h_price,
+            lowest24h: matched.lowest_24h_price,
+            marketSymbol: matched.symbol,
+            fetchedAt: Date.now(),
+          };
 
-          if (matched && livePriceNum > 0) {
-            updatedMeta[sym] = {
-              price: livePriceNum,
-              change24h: matched.change_24h,
-              highest24h: matched.highest_24h_price,
-              lowest24h: matched.lowest_24h_price,
-              marketSymbol: matched.symbol,
-              fetchedAt: Date.now(),
-            };
-
-            // Auto-fill price field if not manually overridden, or if forceRefresh is true
-            if (!manualOverrideFlags[sym] || forceRefresh) {
-              updatedPrices[sym] = String(livePriceNum);
-              pendingPriceUpdates.push({ sym, livePriceNum, pair: `${sym}/${quoteCurrency}` });
-            }
-          } else if (!updatedPrices[sym]) {
-            // Check if passed in customPrices prop has it
-            if (customPrices && customPrices[sym] && customPrices[sym] > 0) {
-              updatedPrices[sym] = String(customPrices[sym]);
-            } else if (fallbackRows && fallbackRows.length > 0) {
-              // Fallback to average of rows for this symbol if Wallex market is offline or symbol not listed
-              const symRows = fallbackRows.filter(r => (r.symbol || '').toUpperCase() === sym);
-              if (symRows.length > 0) {
-                const avg = Math.round(symRows.reduce((a, b) => a + b.price, 0) / symRows.length);
-                if (avg > 0) updatedPrices[sym] = String(avg);
-              }
+          // Auto-fill price field if not manually overridden, or if forceRefresh is true
+          if (!manualOverrideFlags[sym] || forceRefresh) {
+            newPrices[sym] = String(livePriceNum);
+            pendingPriceUpdates.push({ sym, livePriceNum, pair: `${sym}/${quoteCurrency}` });
+          }
+        } else if (!livePrices[sym]) {
+          // Check if passed in customPrices prop has it
+          if (customPrices && customPrices[sym] && customPrices[sym] > 0) {
+            newPrices[sym] = String(customPrices[sym]);
+          } else if (fallbackRows && fallbackRows.length > 0) {
+            // Fallback to average of rows for this symbol if Wallex market is offline or symbol not listed
+            const symRows = fallbackRows.filter(r => (r.symbol || '').toUpperCase() === sym);
+            if (symRows.length > 0) {
+              const avg = Math.round(symRows.reduce((a, b) => a + b.price, 0) / symRows.length);
+              if (avg > 0) newPrices[sym] = String(avg);
             }
           }
-        });
-
-        setMarketMetadata(updatedMeta);
-        return updatedPrices;
+        }
       });
+
+      if (Object.keys(newMeta).length > 0) {
+        setMarketMetadata(prev => ({ ...prev, ...newMeta }));
+      }
+      if (Object.keys(newPrices).length > 0) {
+        setLivePrices(prev => ({ ...prev, ...newPrices }));
+      }
 
       // Notify parent safely outside of the setState callback cycle
       if (onUpdatePrice && pendingPriceUpdates.length > 0) {
@@ -303,7 +304,7 @@ export const ImageTradeExtractorCard: React.FC<Props> = ({
             onUpdatePrice(sym, livePriceNum);
             onUpdatePrice(pair, livePriceNum);
           });
-        }, 0);
+        }, 50);
       }
     } catch (err: any) {
       console.warn('Failed to fetch Wallex live prices:', err);
@@ -1114,13 +1115,13 @@ CRITICAL RULES:
     <div 
       ref={containerRef}
       id="image-trade-extractor-card"
-      className="rounded-2xl border border-indigo-500/30 dark:border-indigo-500/20 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all"
+      className="rounded-2xl border border-indigo-500/25 dark:border-indigo-500/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-lg shadow-indigo-950/5 overflow-hidden transition-all"
     >
       {/* Header Banner */}
-      <div className="p-4 sm:p-6 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border-b border-slate-200 dark:border-slate-800">
+      <div className="p-4 sm:p-6 bg-gradient-to-r from-indigo-500/15 via-purple-500/5 to-transparent border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 shrink-0">
+            <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/15 text-indigo-600 dark:text-indigo-400 shrink-0 shadow-xs shadow-indigo-500/10">
               <Camera className="w-6 h-6" />
             </div>
             <div>
@@ -1128,43 +1129,12 @@ CRITICAL RULES:
                 <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
                   {isFa ? 'استخراج هوشمند معاملات از اسکرین‌شات (چند ارزی و تفکیک‌شده)' : 'AI Trade Screenshot & Multi-Currency Extractor'}
                 </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Gemini Vision</span>
-                </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                  <Layers className="w-3 h-3" />
-                  <span>{isFa ? 'تفکیک خودکار ارزها' : 'Multi-Asset'}</span>
-                </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                {isFa 
-                  ? 'اسکرین‌شات جدول معاملات صرافی را آپلود کنید یا Ctrl+V بزنید؛ هوش مصنوعی ردیف‌های تمام ارزها (مثلاً همزمان ICP و TON) را به صورت کاملاً مجزا تفکیک و بهای تمام شده هر ارز را جداگانه محاسبه می‌کند.'
-                  : 'Upload or paste (Ctrl+V) trade history. Automatically detects, separates, and calculates each cryptocurrency asset independently.'}
-              </p>
             </div>
           </div>
 
-          {/* Quick Demo Buttons */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
-            <button
-              type="button"
-              onClick={handleLoadMultiDemo}
-              disabled={isExtracting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
-              title={isFa ? 'تست تفکیک دو ارز ICP و TON در یک اسکرین‌شات' : 'Test multi-asset separation'}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isFa ? 'تست دو ارزی (ICP + TON تفکیک‌شده)' : 'Test Multi-Asset (ICP + TON)'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleLoadSingleDemo}
-              disabled={isExtracting}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-slate-700 transition cursor-pointer disabled:opacity-50"
-            >
-              <span>{isFa ? 'تست تک ارزی (ICP)' : 'Test Single (ICP)'}</span>
-            </button>
             {uploadedImages.length > 0 && (
               <button
                 type="button"
@@ -1202,26 +1172,20 @@ CRITICAL RULES:
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer ${
+            className={`border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer backdrop-blur-md ${
               isDragging
-                ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 scale-[1.008]'
-                : 'border-slate-300 dark:border-slate-700 hover:border-indigo-500/70 bg-slate-50/50 dark:bg-slate-900/50'
+                ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30 scale-[1.008]'
+                : 'border-indigo-500/30 dark:border-indigo-500/20 hover:border-indigo-500/60 bg-white/70 dark:bg-slate-900/60 shadow-xs'
             }`}
           >
             <div className="flex flex-col items-center justify-center max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-3">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/10 dark:from-indigo-500/25 dark:to-purple-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-3 shadow-sm shadow-indigo-500/10">
                 <Images className="w-8 h-8" />
               </div>
 
-              <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-1">
+              <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">
                 {isFa ? 'بارگذاری همزمان یک یا چند اسکرین‌شات (Ctrl+V)' : 'Upload Multiple Screenshots or Paste (Ctrl+V)'}
               </h4>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                {isFa 
-                  ? 'می‌توانید چند عکس مختلف یا اسکرین‌شات‌های اسکرول شده از تاریخچه معاملات را همزمان انتخاب کنید. هوش مصنوعی معاملات را از تمام عکس‌ها استخراج و در صورت اشتراک صفحات، تجمیع و اصلاح می‌نماید.'
-                  : 'Select or drag multiple screenshots simultaneously. Gemini analyzes all images together, deduplicating overlapping trades.'}
-              </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
                 <button
@@ -1231,15 +1195,6 @@ CRITICAL RULES:
                 >
                   <FileImage className="w-4 h-4" />
                   <span>{isFa ? 'انتخاب چند عکس با هم' : 'Select Multiple Screenshots'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleLoadMultiDemo}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>{isFa ? 'تست نمونه چند عکسی (۲ صفحه)' : 'Load Multi-Image Demo'}</span>
                 </button>
               </div>
 
@@ -2149,45 +2104,32 @@ CRITICAL RULES:
               </div>
             </div>
 
-            {/* Canonical Wallex Columns Reference Banner & Quick Side Switch */}
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[11px] flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-extrabold text-indigo-700 dark:text-indigo-300">
-                  {isFa ? 'ترتیب ستون‌ها (مطابق سرستون رسمی والکس):' : 'Standard Wallex Column Order (RTL):'}
-                </span>
-                <span className="text-slate-600 dark:text-slate-300 font-sans text-[10px] sm:text-[11px]">
-                  {isFa 
-                    ? '۱. بازار | ۲. فروشنده | ۳. خریدار | ۴. قیمت واحد | ۵. مقدار | ۶. قیمت کل | ۷. کارمزد فروشنده (تومان) | ۸. کارمزد خریدار (کوین) | ۹. تاریخ | ۱۰. نوع معامله'
-                    : '1. Market | 2. Seller | 3. Buyer | 4. Unit Price | 5. Qty | 6. Total | 7. Seller Fee (TMN) | 8. Buyer Fee (Coin) | 9. Date | 10. Type'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto">
-                <button
-                  type="button"
-                  onClick={() => handleSetAllSide('BUY')}
-                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 transition cursor-pointer"
-                  title={isFa ? 'تنظیم نوع تمام سطرها به خرید' : 'Set all rows to BUY'}
-                >
-                  {isFa ? 'همه: خرید 🟢' : 'All: BUY 🟢'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetAllSide('SELL')}
-                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition cursor-pointer"
-                  title={isFa ? 'تنظیم نوع تمام سطرها به فروش' : 'Set all rows to SELL'}
-                >
-                  {isFa ? 'همه: فروش 🔴' : 'All: SELL 🔴'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleAllSides}
-                  className="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition cursor-pointer"
-                  title={isFa ? 'معکوس کردن خرید و فروش در تمام سطرها' : 'Invert BUY and SELL for all rows'}
-                >
-                  {isFa ? 'معکوس کردن ⇄' : 'Invert ⇄'}
-                </button>
-              </div>
+            {/* Quick Batch Side Controls */}
+            <div className="flex items-center justify-end gap-1.5 pb-1">
+              <button
+                type="button"
+                onClick={() => handleSetAllSide('BUY')}
+                className="px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 transition cursor-pointer"
+                title={isFa ? 'تنظیم نوع تمام سطرها به خرید' : 'Set all rows to BUY'}
+              >
+                {isFa ? 'همه: خرید 🟢' : 'All: BUY 🟢'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetAllSide('SELL')}
+                className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition cursor-pointer"
+                title={isFa ? 'تنظیم نوع تمام سطرها به فروش' : 'Set all rows to SELL'}
+              >
+                {isFa ? 'همه: فروش 🔴' : 'All: SELL 🔴'}
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleAllSides}
+                className="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition cursor-pointer"
+                title={isFa ? 'معکوس کردن خرید و فروش در تمام سطرها' : 'Invert BUY and SELL for all rows'}
+              >
+                {isFa ? 'معکوس کردن ⇄' : 'Invert ⇄'}
+              </button>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-slate-300 dark:border-slate-700 max-h-80 overflow-y-auto">
