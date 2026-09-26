@@ -120,15 +120,15 @@ export const TradesTable: React.FC<Props> = ({
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden">
+    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-lg shadow-slate-950/5 overflow-hidden">
       {/* Header & Controls */}
-      <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 space-y-3">
+      <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-slate-800/80 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h3 className="text-base sm:text-lg font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent flex items-center gap-2">
               <Calendar className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.tradeHistoryTitle}</span>
-              <span className="text-xs font-mono font-normal text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+              <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-lg bg-slate-200/60 dark:bg-slate-800/80 border border-slate-300/40 dark:border-slate-700/50">
                 {filteredTrades.length} {lang === 'fa' ? 'ردیف' : 'records'}
               </span>
             </h3>

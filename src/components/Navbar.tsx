@@ -44,16 +44,16 @@ export const Navbar: React.FC<Props> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Left: Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-500/20">
+            <TrendingUp className="w-5 h-5 drop-shadow-xs" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-50 tracking-tight">
+              <h1 className="text-base sm:text-lg font-black tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
                 {t.appTitle}
               </h1>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate max-w-sm md:max-w-md">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:block truncate max-w-sm md:max-w-md">
               {t.privacyGuaranteed}
             </p>
           </div>

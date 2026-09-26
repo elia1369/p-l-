@@ -228,7 +228,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
             <Calculator className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100">
+            <h4 className="text-sm sm:text-base font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
               {t.calcBoxTitle}
             </h4>
           </div>

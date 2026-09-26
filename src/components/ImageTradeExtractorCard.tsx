@@ -1126,7 +1126,7 @@ CRITICAL RULES:
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
+                <h3 className="text-base sm:text-lg font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-300 dark:to-pink-400 bg-clip-text text-transparent">
                   {isFa ? 'استخراج هوشمند معاملات از اسکرین‌شات (چند ارزی و تفکیک‌شده)' : 'AI Trade Screenshot & Multi-Currency Extractor'}
                 </h3>
               </div>
@@ -1183,7 +1183,7 @@ CRITICAL RULES:
                 <Images className="w-8 h-8" />
               </div>
 
-              <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">
+              <h4 className="text-base font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-300 dark:via-purple-200 dark:to-pink-300 bg-clip-text text-transparent mb-4">
                 {isFa ? 'بارگذاری همزمان یک یا چند اسکرین‌شات (Ctrl+V)' : 'Upload Multiple Screenshots or Paste (Ctrl+V)'}
               </h4>
 
@@ -1191,7 +1191,7 @@ CRITICAL RULES:
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-sm transition cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-500/25 active:scale-95 transition cursor-pointer"
                 >
                   <FileImage className="w-4 h-4" />
                   <span>{isFa ? 'انتخاب چند عکس با هم' : 'Select Multiple Screenshots'}</span>

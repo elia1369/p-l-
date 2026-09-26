@@ -25,7 +25,8 @@ import {
 } from './utils/excelParser';
 import { translations } from './utils/i18n';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
-import bgWallpaper from './assets/images/crypto_fintech_bg_1790403820718.jpg';
+import bgWallpaperDark from './assets/images/crypto_fintech_bg_1790403820718.jpg';
+import bgWallpaperLight from './assets/images/fintech_light_bg_1790404497815.jpg';
 
 export default function App() {
   // 1. Core State
@@ -189,23 +190,37 @@ export default function App() {
 
   return (
     <div 
-      className="relative min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden selection:bg-emerald-500/20 selection:text-emerald-400"
+      className="relative min-h-screen bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-x-hidden selection:bg-emerald-500/20 selection:text-emerald-400"
       dir={lang === 'fa' ? 'rtl' : 'ltr'}
     >
-      {/* Ambient Visual Background with Generated Fintech Wallpaper */}
+      {/* Ambient Visual Background: High-Def Light and Dark Mode Wallpapers */}
       <div 
         className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
         aria-hidden="true"
       >
+        {/* Light Mode Wallpaper */}
         <img 
-          src={bgWallpaper}
+          src={bgWallpaperLight}
           alt=""
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover object-top opacity-20 dark:opacity-30 filter blur-[0.5px] scale-100 transition-opacity duration-700"
+          className="dark:hidden w-full h-full object-cover object-top opacity-60 filter contrast-105"
         />
-        {/* Subtle mesh gradients for premium depth */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-50/85 via-slate-50/92 to-slate-50 dark:from-slate-950/80 dark:via-slate-950/92 dark:to-slate-950" />
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-br from-emerald-500/10 via-cyan-500/10 to-indigo-500/0 rounded-full blur-3xl pointer-events-none" />
+        {/* Dark Mode Wallpaper */}
+        <img 
+          src={bgWallpaperDark}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="hidden dark:block w-full h-full object-cover object-top opacity-35 filter contrast-110"
+        />
+
+        {/* Dynamic Light Theme Overlays */}
+        <div className="dark:hidden absolute inset-0 bg-gradient-to-b from-white/30 via-slate-50/50 to-slate-100/70" />
+        <div className="dark:hidden absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-r from-emerald-400/20 via-teal-400/20 to-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Dynamic Dark Theme Overlays */}
+        <div className="hidden dark:block absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/85 to-slate-950" />
+        <div className="hidden dark:block absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-br from-emerald-500/15 via-cyan-500/15 to-indigo-500/0 rounded-full blur-3xl pointer-events-none" />
+        <div className="hidden dark:block absolute top-1/3 -right-24 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
       {/* Navigation Bar */}
