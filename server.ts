@@ -722,6 +722,34 @@ interface StoredUser {
   }>;
   watchlist: string[];
   notes?: string;
+  phoneNumber?: string;
+  wallexApi?: {
+    apiKey?: string;
+    apiSecret?: string;
+    isConnected: boolean;
+    lastSyncAt?: string;
+    autoSyncEnabled?: boolean;
+  };
+  alerts?: Array<{
+    id: string;
+    symbol: string;
+    condition: 'ABOVE' | 'BELOW' | 'PNL_PROFIT' | 'PNL_LOSS';
+    targetValue: number;
+    currency: 'TMN' | 'USD';
+    note?: string;
+    createdAt: string;
+    isActive: boolean;
+  }>;
+  journalEntries?: Array<{
+    id: string;
+    date: string;
+    symbol: string;
+    action: 'BUY' | 'SELL' | 'HOLD' | 'REVIEW';
+    pnl?: number;
+    emotion: 'LOGICAL' | 'GREED' | 'FEAR' | 'FOMO' | 'DISCIPLINED';
+    lesson: string;
+    strategyTag: string;
+  }>;
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -766,6 +794,48 @@ function getInitialDemoUser(): StoredUser {
     ],
     watchlist: ["BTC/TMN", "ETH/TMN", "TON/TMN", "ICP/TMN", "SOL/USDT"],
     notes: "استراتژی ورود پله‌ای روی حمایت‌های فیبوناچی ۰.۶۱۸ - خروج در سطوح مقاومت روزانه",
+    phoneNumber: "09123456789",
+    wallexApi: {
+      apiKey: "wlx_live_8941f...82",
+      apiSecret: "••••••••••••••••",
+      isConnected: true,
+      lastSyncAt: new Date().toISOString(),
+      autoSyncEnabled: true,
+    },
+    alerts: [
+      {
+        id: "alt_01",
+        symbol: "TON/TMN",
+        condition: "ABOVE",
+        targetValue: 480000,
+        currency: "TMN",
+        note: "تارگت اول مقاومت - ذخیره سود ۳۰ درصدی",
+        createdAt: new Date().toISOString(),
+        isActive: true,
+      },
+      {
+        id: "alt_02",
+        symbol: "BTC/USDT",
+        condition: "BELOW",
+        targetValue: 92000,
+        currency: "USD",
+        note: "حد ضرر شکست محدوده رِنج",
+        createdAt: new Date().toISOString(),
+        isActive: true,
+      }
+    ],
+    journalEntries: [
+      {
+        id: "jrn_01",
+        date: new Date().toISOString(),
+        symbol: "ICP/TMN",
+        action: "BUY",
+        pnl: 14200000,
+        emotion: "LOGICAL",
+        lesson: "پایبندی به استراتژی ورود پس از تایید کندل برگشتی ۳۰ دقیقه‌ای بدون عجله و فومو.",
+        strategyTag: "Pullback",
+      }
+    ],
   };
 }
 
@@ -990,17 +1060,27 @@ app.delete("/api/user/saved-portfolios/:id", (req, res) => {
   });
 });
 
-// 7. Update User Profile Settings / Watchlist / Notes
+// 7. Update User Profile Settings / Watchlist / Notes / Wallex API / Alerts / Journal
 app.put("/api/user/profile", (req, res) => {
   const user = getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ success: false, error: "عدم دسترسی." });
   }
 
-  const { name, watchlist, notes } = req.body;
+  const { name, watchlist, notes, wallexApi, alerts, journalEntries, phoneNumber } = req.body;
   if (name !== undefined) user.name = String(name).trim();
   if (Array.isArray(watchlist)) user.watchlist = watchlist;
   if (notes !== undefined) user.notes = String(notes);
+  if (phoneNumber !== undefined) user.phoneNumber = String(phoneNumber).trim();
+  if (wallexApi !== undefined && typeof wallexApi === 'object') {
+    user.wallexApi = {
+      ...user.wallexApi,
+      ...wallexApi,
+      isConnected: Boolean(wallexApi.apiKey),
+    };
+  }
+  if (Array.isArray(alerts)) user.alerts = alerts;
+  if (Array.isArray(journalEntries)) user.journalEntries = journalEntries;
 
   saveUsers(inMemoryUsers);
 
@@ -1008,6 +1088,28 @@ app.put("/api/user/profile", (req, res) => {
     success: true,
     user: sanitizeUser(user),
     message: "تغییرات با موفقیت ذخیره شد.",
+  });
+});
+
+// 8. Wallex API Live Sync Simulator Endpoint (User-Only)
+app.post("/api/user/wallex-sync", async (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ success: false, error: "عدم دسترسی." });
+  }
+
+  // Update sync timestamp
+  if (!user.wallexApi) {
+    user.wallexApi = { isConnected: true };
+  }
+  user.wallexApi.lastSyncAt = new Date().toISOString();
+  saveUsers(inMemoryUsers);
+
+  return res.json({
+    success: true,
+    lastSyncAt: user.wallexApi.lastSyncAt,
+    syncedRecordsCount: 14,
+    message: "همگام‌سازی مستقیم با موفقیت انجام شد.",
   });
 });
 

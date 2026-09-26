@@ -16,7 +16,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   saveCurrentPortfolio: (name: string, trades: TradeRecord[], summary?: Partial<PortfolioSummary>) => Promise<{ success: boolean; error?: string; portfolio?: SavedPortfolio }>;
   deleteSavedPortfolio: (id: string) => Promise<{ success: boolean; error?: string }>;
-  updateUserProfile: (data: { name?: string; watchlist?: string[]; notes?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateUserProfile: (data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
+  syncWallexApi: () => Promise<{ success: boolean; message?: string; error?: string; lastSyncAt?: string }>;
   authModalMode: 'login' | 'register';
 }
 
@@ -239,7 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUserProfile = async (data: { name?: string; watchlist?: string[]; notes?: string }): Promise<{ success: boolean; error?: string }> => {
+  const updateUserProfile = async (data: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> => {
     if (!token) return { success: false, error: 'عدم دسترسی.' };
 
     try {
@@ -265,6 +266,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const syncWallexApi = async (): Promise<{ success: boolean; message?: string; error?: string; lastSyncAt?: string }> => {
+    if (!token) return { success: false, error: 'عدم دسترسی.' };
+
+    try {
+      const res = await fetch('/api/user/wallex-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'خطا در همگام‌سازی.' };
+      }
+
+      setUser(prev => {
+        if (!prev) return null;
+        const updatedWallex = {
+          ...(prev.wallexApi || { isConnected: true }),
+          lastSyncAt: data.lastSyncAt,
+        };
+        const updated = { ...prev, wallexApi: updatedWallex };
+        localStorage.setItem(USER_KEY, JSON.stringify(updated));
+        return updated;
+      });
+
+      return { success: true, message: data.message, lastSyncAt: data.lastSyncAt };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'خطا در اتصال به سرور همگام‌سازی.' };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -283,6 +318,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         saveCurrentPortfolio,
         deleteSavedPortfolio,
         updateUserProfile,
+        syncWallexApi,
         authModalMode,
       }}
     >

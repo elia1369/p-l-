@@ -110,15 +110,59 @@ export interface SavedPortfolio {
   trades: TradeRecord[];
 }
 
+export interface PriceAlert {
+  id: string;
+  symbol: string;
+  condition: 'ABOVE' | 'BELOW' | 'PNL_PROFIT' | 'PNL_LOSS';
+  targetValue: number;
+  currency: CurrencyKind;
+  note?: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface TaxFiscalYearReport {
+  year: string;
+  totalGrossProfit: number;
+  totalGrossLoss: number;
+  netTaxableGain: number;
+  totalTradingFeesDeduction: number;
+  estimatedTaxPayable: number;
+  taxBracketPercent: number;
+}
+
+export interface WallexApiConfig {
+  apiKey?: string;
+  apiSecret?: string;
+  isConnected: boolean;
+  lastSyncAt?: string;
+  autoSyncEnabled?: boolean;
+}
+
+export interface TradeJournalEntry {
+  id: string;
+  date: string;
+  symbol: string;
+  action: 'BUY' | 'SELL' | 'HOLD' | 'REVIEW';
+  pnl?: number;
+  emotion: 'LOGICAL' | 'GREED' | 'FEAR' | 'FOMO' | 'DISCIPLINED';
+  lesson: string;
+  strategyTag: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   name?: string;
   avatar?: string;
+  phoneNumber?: string;
   memberTier: 'Standard' | 'Pro Trader' | 'VIP';
   createdAt: string;
   lastLoginAt?: string;
   savedPortfolios: SavedPortfolio[];
   watchlist: string[];
   notes?: string;
+  wallexApi?: WallexApiConfig;
+  alerts?: PriceAlert[];
+  journalEntries?: TradeJournalEntry[];
 }
