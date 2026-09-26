@@ -27,11 +27,13 @@ import { translations } from './utils/i18n';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import bgWallpaperDark from './assets/images/crypto_fintech_bg_1790403820718.jpg';
 import bgWallpaperLight from './assets/images/fintech_light_bg_1790404497815.jpg';
-import { AuthProvider } from './utils/authContext';
+import { AuthProvider, useAuth } from './utils/authContext';
 import { AuthModal } from './components/AuthModal';
 import { PersonalizedUserPortal } from './components/PersonalizedUserPortal';
 
 function MainDashboard() {
+  const { user, activeView, setActiveView } = useAuth();
+
   // 1. Core State
   const [lang, setLang] = useState<Language>('fa');
   const [theme, setTheme] = useState<ThemeMode>('dark');
@@ -244,53 +246,117 @@ function MainDashboard() {
 
       {/* Main Content Area */}
       <main className="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Upload & Drag-Drop Area with Current Price P&L Calculator */}
-        <FileUploadArea
-          lang={lang}
-          onFileSelected={handleFileSelected}
-          onLoadDemo={handleLoadDemo}
-          isLoading={isLoadingFile}
-          fileName={uploadedFileName}
-          assets={assetAnalyses}
-          customPrices={customPrices}
-          onUpdatePrice={handleUpdatePrice}
-          onApplyManualData={handleApplyManualData}
-        />
+        {/* Member Mode Switcher (Visible ONLY when user is logged in) */}
+        {user && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 shadow-md">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="text-xs">
+                <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                  {lang === 'fa' ? 'حساب کاربری فعال: ' : 'Active Account: '}
+                </span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                  {user.name || user.email}
+                </span>
+                <span className="ms-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                  {user.memberTier || 'Pro Trader'}
+                </span>
+              </div>
+            </div>
 
-        {/* Overview Metrics Cards */}
-        {trades.length > 0 && (
-          <OverviewCards summary={portfolioSummary} lang={lang} />
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => setActiveView('WORKSPACE')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeView === 'WORKSPACE'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
+                }`}
+              >
+                <span>{lang === 'fa' ? '📊 میز کار تحلیل عمومی' : '📊 Analysis Workspace'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveView('USER_PANEL')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeView === 'USER_PANEL'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
+                }`}
+              >
+                <span>{lang === 'fa' ? '👤 پنل کاربری اختصاصی' : '👤 My User Panel'}</span>
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* Visual Portfolio Distribution Pie Chart & Trade History Trend Line Chart */}
-        {trades.length > 0 && (
-          <PortfolioCharts 
-            assets={assetAnalyses} 
-            trades={trades} 
-            lang={lang} 
-          />
-        )}
-
-        {/* Asset Performance Breakdown & Live Market Price Comparison */}
-        {trades.length > 0 && (
-          <AssetAnalyzer
-            assets={assetAnalyses}
+        {/* View 1: When user is in USER_PANEL view (Registered Users Only) */}
+        {user && activeView === 'USER_PANEL' ? (
+          <PersonalizedUserPortal
             lang={lang}
-            onUpdatePrice={handleUpdatePrice}
-            onOpenSimulator={(asset) => setSimulatorAsset(asset)}
+            currentTrades={trades}
+            currentSummary={portfolioSummary}
+            onRestorePortfolio={(restoredTrades) => {
+              setTrades(restoredTrades);
+              setUploadedFileName('پورتفوی ابری بازیابی‌شده');
+              setActiveView('WORKSPACE');
+            }}
+            embedded={true}
           />
-        )}
+        ) : (
+          /* View 2: Normal Analysis Workspace (for Guests & Member analysis) */
+          <>
+            {/* Upload & Drag-Drop Area with Current Price P&L Calculator */}
+            <FileUploadArea
+              lang={lang}
+              onFileSelected={handleFileSelected}
+              onLoadDemo={handleLoadDemo}
+              isLoading={isLoadingFile}
+              fileName={uploadedFileName}
+              assets={assetAnalyses}
+              customPrices={customPrices}
+              onUpdatePrice={handleUpdatePrice}
+              onApplyManualData={handleApplyManualData}
+            />
 
-        {/* Detailed Extracted Trades Table */}
-        {trades.length > 0 && (
-          <TradesTable
-            trades={trades}
-            lang={lang}
-            onDeleteTrade={handleDeleteTrade}
-            onAddTrade={handleAddTrade}
-            onExportExcel={handleExportExcel}
-            onToggleSide={handleToggleTradeSide}
-          />
+            {/* Overview Metrics Cards */}
+            {trades.length > 0 && (
+              <OverviewCards summary={portfolioSummary} lang={lang} />
+            )}
+
+            {/* Visual Portfolio Distribution Pie Chart & Trade History Trend Line Chart */}
+            {trades.length > 0 && (
+              <PortfolioCharts 
+                assets={assetAnalyses} 
+                trades={trades} 
+                lang={lang} 
+              />
+            )}
+
+            {/* Asset Performance Breakdown & Live Market Price Comparison */}
+            {trades.length > 0 && (
+              <AssetAnalyzer
+                assets={assetAnalyses}
+                lang={lang}
+                onUpdatePrice={handleUpdatePrice}
+                onOpenSimulator={(asset) => setSimulatorAsset(asset)}
+              />
+            )}
+
+            {/* Detailed Extracted Trades Table */}
+            {trades.length > 0 && (
+              <TradesTable
+                trades={trades}
+                lang={lang}
+                onDeleteTrade={handleDeleteTrade}
+                onAddTrade={handleAddTrade}
+                onExportExcel={handleExportExcel}
+                onToggleSide={handleToggleTradeSide}
+              />
+            )}
+          </>
         )}
       </main>
 

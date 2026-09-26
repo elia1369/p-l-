@@ -7,6 +7,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthModalOpen: boolean;
   isPortalOpen: boolean;
+  activeView: 'WORKSPACE' | 'USER_PANEL';
+  setActiveView: (view: 'WORKSPACE' | 'USER_PANEL') => void;
   openAuthModal: (initialMode?: 'login' | 'register') => void;
   closeAuthModal: () => void;
   openPortal: () => void;
@@ -47,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isPortalOpen, setIsPortalOpen] = useState<boolean>(false);
+  const [activeView, setActiveView] = useState<'WORKSPACE' | 'USER_PANEL'>('WORKSPACE');
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
   const openAuthModal = useCallback((mode: 'login' | 'register' = 'login') => {
@@ -59,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const openPortal = useCallback(() => {
+    setActiveView('USER_PANEL');
     setIsPortalOpen(true);
   }, []);
 
@@ -130,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       setIsAuthModalOpen(false);
+      setActiveView('USER_PANEL');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'خطای اتصال به سرور.' };
@@ -157,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       setIsAuthModalOpen(false);
+      setActiveView('USER_PANEL');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'خطای اتصال به سرور.' };
@@ -181,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       setIsPortalOpen(false);
+      setActiveView('WORKSPACE');
     }
   };
 
@@ -319,6 +326,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteSavedPortfolio,
         updateUserProfile,
         syncWallexApi,
+        activeView,
+        setActiveView,
         authModalMode,
       }}
     >

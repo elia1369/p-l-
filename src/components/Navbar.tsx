@@ -142,20 +142,23 @@ export const Navbar: React.FC<Props> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-bold shadow-sm shadow-emerald-500/25 active:scale-95 transition cursor-pointer ms-1"
             >
               <User className="w-3.5 h-3.5" />
-              <span>{lang === 'fa' ? 'ورود / ثبت‌نام' : 'Sign In'}</span>
+              <span>{lang === 'fa' ? 'ورود / ثبت‌نام' : 'Sign In / Register'}</span>
             </button>
           ) : (
             <button
               id="nav-user-portal-btn"
               type="button"
               onClick={openPortal}
-              className="flex items-center gap-2 p-1 pe-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer ms-1"
-              title={lang === 'fa' ? 'پرتال اختصاصی من' : 'My Personal Portal'}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-indigo-500/20 hover:from-emerald-500/30 hover:to-indigo-500/30 border border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-xs font-black shadow-xs transition cursor-pointer ms-1"
+              title={lang === 'fa' ? 'ورود به پنل کاربری اختصاصی' : 'Open User Panel'}
             >
               <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-white text-[11px] font-black shadow-xs">
                 {user.name ? user.name[0].toUpperCase() : user.email[0].toUpperCase()}
               </div>
-              <span className="hidden sm:inline max-w-[100px] truncate">{user.name || user.email.split('@')[0]}</span>
+              <span className="font-extrabold">{lang === 'fa' ? 'پنل کاربری من' : 'My User Panel'}</span>
+              <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-200">
+                {user.memberTier || 'Pro'}
+              </span>
             </button>
           )}
         </div>
