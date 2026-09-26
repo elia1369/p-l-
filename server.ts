@@ -1,5 +1,7 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
+import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -694,6 +696,319 @@ Return structured JSON matching the schema.
       attemptLogs,
     });
   }
+});
+
+// -------------------------------------------------------------
+// User Authentication & Personalized Portfolio Storage System
+// -------------------------------------------------------------
+interface StoredUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  salt: string;
+  name?: string;
+  memberTier: 'Standard' | 'Pro Trader' | 'VIP';
+  createdAt: string;
+  lastLoginAt?: string;
+  savedPortfolios: Array<{
+    id: string;
+    name: string;
+    savedAt: string;
+    tradesCount: number;
+    assetsCount: number;
+    totalVolume: number;
+    netPnL: number;
+    trades: any[];
+  }>;
+  watchlist: string[];
+  notes?: string;
+}
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const USERS_FILE = path.join(DATA_DIR, "users.json");
+
+function ensureDataDir(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.error("Failed to create data directory:", err);
+  }
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.createHash("sha256").update(password + ":" + salt).digest("hex");
+}
+
+function getInitialDemoUser(): StoredUser {
+  const salt = "wallex_secure_salt_987";
+  return {
+    id: "usr_wallex_demo_01",
+    email: "trader@wallex.net",
+    passwordHash: hashPassword("wallex123", salt),
+    salt,
+    name: "کاربر معامله‌گر والکس",
+    memberTier: "Pro Trader",
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+    savedPortfolios: [
+      {
+        id: "port_sample_01",
+        name: "پورتفوی سودده بهاره (ICP & TON)",
+        savedAt: new Date().toISOString(),
+        tradesCount: 6,
+        assetsCount: 2,
+        totalVolume: 84500000,
+        netPnL: 14200000,
+        trades: [],
+      }
+    ],
+    watchlist: ["BTC/TMN", "ETH/TMN", "TON/TMN", "ICP/TMN", "SOL/USDT"],
+    notes: "استراتژی ورود پله‌ای روی حمایت‌های فیبوناچی ۰.۶۱۸ - خروج در سطوح مقاومت روزانه",
+  };
+}
+
+let inMemoryUsers: Map<string, StoredUser> = new Map();
+const activeSessions: Map<string, string> = new Map(); // token -> userId
+
+function loadUsers(): Map<string, StoredUser> {
+  ensureDataDir();
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const content = fs.readFileSync(USERS_FILE, "utf-8");
+      const list: StoredUser[] = JSON.parse(content);
+      const map = new Map<string, StoredUser>();
+      for (const u of list) {
+        map.set(u.email.toLowerCase(), u);
+      }
+      return map;
+    }
+  } catch (err) {
+    console.warn("Could not read users.json, using fallback:", err);
+  }
+
+  // Fallback with demo user
+  const fallback = new Map<string, StoredUser>();
+  const demo = getInitialDemoUser();
+  fallback.set(demo.email.toLowerCase(), demo);
+  saveUsers(fallback);
+  return fallback;
+}
+
+function saveUsers(usersMap: Map<string, StoredUser>): void {
+  ensureDataDir();
+  try {
+    const list = Array.from(usersMap.values());
+    fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to write users.json:", err);
+  }
+}
+
+// Initialize users map
+inMemoryUsers = loadUsers();
+
+// Sanitize user before sending to client (strip hash & salt)
+function sanitizeUser(u: StoredUser) {
+  const { passwordHash, salt, ...safe } = u;
+  return safe;
+}
+
+// Helper: Extract user from Bearer token
+function getUserFromRequest(req: express.Request): StoredUser | null {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  const token = authHeader.substring(7).trim();
+  const userId = activeSessions.get(token);
+  if (!userId) return null;
+
+  for (const user of inMemoryUsers.values()) {
+    if (user.id === userId) return user;
+  }
+  return null;
+}
+
+// 1. User Register
+app.post("/api/auth/register", (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return res.status(400).json({ success: false, error: "ایمیل وارد شده نامعتبر است." });
+    }
+    if (!password || typeof password !== "string" || password.length < 5) {
+      return res.status(400).json({ success: false, error: "رمز عبور باید حداقل ۵ کاراکتر باشد." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (inMemoryUsers.has(cleanEmail)) {
+      return res.status(409).json({ success: false, error: "این ایمیل قبلاً در سامانه ثبت شده است. لطفاً وارد شوید." });
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const newUser: StoredUser = {
+      id: "usr_" + crypto.randomBytes(8).toString("hex"),
+      email: cleanEmail,
+      passwordHash: hashPassword(password, salt),
+      salt,
+      name: name ? String(name).trim() : cleanEmail.split("@")[0],
+      memberTier: "Standard",
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      savedPortfolios: [],
+      watchlist: ["BTC/TMN", "ETH/TMN", "TON/TMN"],
+      notes: "",
+    };
+
+    inMemoryUsers.set(cleanEmail, newUser);
+    saveUsers(inMemoryUsers);
+
+    const token = "tok_" + crypto.randomBytes(24).toString("hex");
+    activeSessions.set(token, newUser.id);
+
+    return res.json({
+      success: true,
+      token,
+      user: sanitizeUser(newUser),
+      message: "ثبت‌نام با موفقیت انجام شد.",
+    });
+  } catch (err: any) {
+    console.error("Register Error:", err);
+    return res.status(500).json({ success: false, error: "خطا در فرآیند ثبت‌نام کاربر." });
+  }
+});
+
+// 2. User Login
+app.post("/api/auth/login", (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: "ایمیل و رمز عبور الزامی هستند." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = inMemoryUsers.get(cleanEmail);
+
+    if (!user) {
+      return res.status(401).json({ success: false, error: "کاربری با این ایمیل یافت نشد یا رمز عبور اشتباه است." });
+    }
+
+    const computed = hashPassword(String(password), user.salt);
+    if (computed !== user.passwordHash) {
+      return res.status(401).json({ success: false, error: "رمز عبور وارد شده نادرست است." });
+    }
+
+    user.lastLoginAt = new Date().toISOString();
+    saveUsers(inMemoryUsers);
+
+    const token = "tok_" + crypto.randomBytes(24).toString("hex");
+    activeSessions.set(token, user.id);
+
+    return res.json({
+      success: true,
+      token,
+      user: sanitizeUser(user),
+      message: "ورود موفقیت‌آمیز بود.",
+    });
+  } catch (err: any) {
+    console.error("Login Error:", err);
+    return res.status(500).json({ success: false, error: "خطا در اعتبارسنجی ورود." });
+  }
+});
+
+// 3. Current User Profile (/api/auth/me)
+app.get("/api/auth/me", (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ success: false, error: "احراز هویت نشده یا نشست منقضی شده است." });
+  }
+  return res.json({
+    success: true,
+    user: sanitizeUser(user),
+  });
+});
+
+// 4. Logout
+app.post("/api/auth/logout", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    activeSessions.delete(token);
+  }
+  return res.json({ success: true, message: "خروج انجام شد." });
+});
+
+// 5. Save Current Portfolio to User Profile
+app.post("/api/user/saved-portfolios", (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ success: false, error: "برای ذخیره در حساب کاربری باید وارد شوید." });
+  }
+
+  const { name, trades = [], summary = {} } = req.body;
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ success: false, error: "نام پورتفو الزامی است." });
+  }
+
+  const newPortfolio = {
+    id: "port_" + crypto.randomBytes(8).toString("hex"),
+    name: name.trim(),
+    savedAt: new Date().toISOString(),
+    tradesCount: Array.isArray(trades) ? trades.length : 0,
+    assetsCount: summary?.assetsCount || 1,
+    totalVolume: (summary?.totalBuyValue || 0) + (summary?.totalSellValue || 0),
+    netPnL: summary?.totalNetPnL || 0,
+    trades: Array.isArray(trades) ? trades : [],
+  };
+
+  user.savedPortfolios = [newPortfolio, ...(user.savedPortfolios || [])];
+  saveUsers(inMemoryUsers);
+
+  return res.json({
+    success: true,
+    portfolio: newPortfolio,
+    savedPortfolios: user.savedPortfolios,
+    message: "پورتفو با موفقیت در حساب شما ذخیره شد.",
+  });
+});
+
+// 6. Delete Saved Portfolio
+app.delete("/api/user/saved-portfolios/:id", (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ success: false, error: "عدم دسترسی." });
+  }
+
+  const targetId = req.params.id;
+  user.savedPortfolios = (user.savedPortfolios || []).filter(p => p.id !== targetId);
+  saveUsers(inMemoryUsers);
+
+  return res.json({
+    success: true,
+    savedPortfolios: user.savedPortfolios,
+    message: "پورتفوی ذخیره‌شده حذف شد.",
+  });
+});
+
+// 7. Update User Profile Settings / Watchlist / Notes
+app.put("/api/user/profile", (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ success: false, error: "عدم دسترسی." });
+  }
+
+  const { name, watchlist, notes } = req.body;
+  if (name !== undefined) user.name = String(name).trim();
+  if (Array.isArray(watchlist)) user.watchlist = watchlist;
+  if (notes !== undefined) user.notes = String(notes);
+
+  saveUsers(inMemoryUsers);
+
+  return res.json({
+    success: true,
+    user: sanitizeUser(user),
+    message: "تغییرات با موفقیت ذخیره شد.",
+  });
 });
 
 // Vite Middleware for Development / Static serving for Production

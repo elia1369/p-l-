@@ -98,3 +98,27 @@ export interface ParsedExcelResult {
   rawHeaders: string[];
   fileName: string;
 }
+
+export interface SavedPortfolio {
+  id: string;
+  name: string;
+  savedAt: string;
+  tradesCount: number;
+  assetsCount: number;
+  totalVolume: number;
+  netPnL: number;
+  trades: TradeRecord[];
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string;
+  avatar?: string;
+  memberTier: 'Standard' | 'Pro Trader' | 'VIP';
+  createdAt: string;
+  lastLoginAt?: string;
+  savedPortfolios: SavedPortfolio[];
+  watchlist: string[];
+  notes?: string;
+}

@@ -111,7 +111,7 @@ export const FileUploadArea: React.FC<Props> = ({
             onClick={() => setActiveTab('EXCEL')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeTab === 'EXCEL'
-                ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
+                ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-xs shadow-sky-600/30'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
@@ -139,18 +139,18 @@ export const FileUploadArea: React.FC<Props> = ({
             onClick={() => fileInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer backdrop-blur-md ${
               isDragging
-                ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 scale-[1.008]'
-                : 'border-emerald-500/30 dark:border-emerald-500/20 hover:border-emerald-500/60 bg-white/70 dark:bg-slate-900/60 shadow-xs'
+                ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 scale-[1.008]'
+                : 'border-sky-500/30 dark:border-sky-500/20 hover:border-sky-500/60 bg-white/70 dark:bg-slate-900/60 shadow-xs'
             }`}
           >
             <div className="flex flex-col items-center justify-center max-w-lg mx-auto">
               {/* Main Icon */}
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 dark:from-emerald-500/25 dark:to-teal-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 transition-transform group-hover:scale-105 shadow-sm shadow-emerald-500/10">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-cyan-500/15 to-blue-500/10 dark:from-sky-500/25 dark:to-blue-500/15 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-4 transition-transform group-hover:scale-105 shadow-sm shadow-sky-500/10">
                 <UploadCloud className="w-8 h-8" />
               </div>
 
               {fileName && (
-                <div className="mb-4 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-xs font-bold border border-emerald-200 dark:border-emerald-800">
+                <div className="mb-4 px-3 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-mono text-xs font-bold border border-sky-200 dark:border-sky-800">
                   {t.fileLoaded}: {fileName}
                 </div>
               )}
@@ -162,7 +162,7 @@ export const FileUploadArea: React.FC<Props> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-xs transition cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-md shadow-sky-600/25 transition cursor-pointer"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>{t.uploadBtn}</span>
@@ -172,7 +172,7 @@ export const FileUploadArea: React.FC<Props> = ({
                   id="download-template-btn"
                   type="button"
                   onClick={downloadExcelTemplate}
-                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-xs sm:text-sm font-medium transition cursor-pointer"
+                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 text-xs sm:text-sm font-medium transition cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>{t.downloadTemplateBtn}</span>

@@ -27,8 +27,11 @@ import { translations } from './utils/i18n';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import bgWallpaperDark from './assets/images/crypto_fintech_bg_1790403820718.jpg';
 import bgWallpaperLight from './assets/images/fintech_light_bg_1790404497815.jpg';
+import { AuthProvider } from './utils/authContext';
+import { AuthModal } from './components/AuthModal';
+import { PersonalizedUserPortal } from './components/PersonalizedUserPortal';
 
-export default function App() {
+function MainDashboard() {
   // 1. Core State
   const [lang, setLang] = useState<Language>('fa');
   const [theme, setTheme] = useState<ThemeMode>('dark');
@@ -314,6 +317,29 @@ export default function App() {
         asset={simulatorAsset}
         lang={lang}
       />
+
+      {/* User Login & Registration Modal */}
+      <AuthModal lang={lang} />
+
+      {/* Personalized Member Portal */}
+      <PersonalizedUserPortal
+        lang={lang}
+        currentTrades={trades}
+        currentSummary={portfolioSummary}
+        onRestorePortfolio={(restoredTrades) => {
+          setTrades(restoredTrades);
+          setUploadedFileName('پورتفوی ابری بازیابی‌شده');
+        }}
+      />
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainDashboard />
+    </AuthProvider>
+  );
+}
+

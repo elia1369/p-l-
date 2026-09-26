@@ -6,11 +6,14 @@ import {
   Languages, 
   FileSpreadsheet, 
   Download,
-  RotateCcw
+  RotateCcw,
+  User,
+  ShieldCheck
 } from 'lucide-react';
 import { Language, ThemeMode, PIIReport } from '../types';
 import { translations } from '../utils/i18n';
 import { downloadExcelTemplate } from '../utils/excelParser';
+import { useAuth } from '../utils/authContext';
 
 interface Props {
   lang: Language;
@@ -38,6 +41,7 @@ export const Navbar: React.FC<Props> = ({
   onExportExcel,
 }) => {
   const t = translations[lang];
+  const { user, openAuthModal, openPortal } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl transition-colors shadow-xs">
@@ -128,6 +132,32 @@ export const Navbar: React.FC<Props> = ({
               <Moon className="w-4 h-4 text-slate-600" />
             )}
           </button>
+
+          {/* User Account / Auth Section (Separate & Optional for Guests) */}
+          {!user ? (
+            <button
+              id="nav-login-btn"
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-bold shadow-sm shadow-emerald-500/25 active:scale-95 transition cursor-pointer ms-1"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>{lang === 'fa' ? 'ورود / ثبت‌نام' : 'Sign In'}</span>
+            </button>
+          ) : (
+            <button
+              id="nav-user-portal-btn"
+              type="button"
+              onClick={openPortal}
+              className="flex items-center gap-2 p-1 pe-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer ms-1"
+              title={lang === 'fa' ? 'پرتال اختصاصی من' : 'My Personal Portal'}
+            >
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-white text-[11px] font-black shadow-xs">
+                {user.name ? user.name[0].toUpperCase() : user.email[0].toUpperCase()}
+              </div>
+              <span className="hidden sm:inline max-w-[100px] truncate">{user.name || user.email.split('@')[0]}</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

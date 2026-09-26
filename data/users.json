@@ -1,0 +1,32 @@
+[
+  {
+    "id": "usr_wallex_demo_01",
+    "email": "trader@wallex.net",
+    "passwordHash": "a78dd017c3dcd892eae6182917fc36922e88eefebd8606a15cc7d9ce77f9d7d8",
+    "salt": "wallex_secure_salt_987",
+    "name": "کاربر معامله‌گر والکس",
+    "memberTier": "Pro Trader",
+    "createdAt": "2026-09-26T07:08:57.861Z",
+    "lastLoginAt": "2026-09-26T07:09:09.842Z",
+    "savedPortfolios": [
+      {
+        "id": "port_sample_01",
+        "name": "پورتفوی سودده بهاره (ICP & TON)",
+        "savedAt": "2026-09-26T07:08:57.862Z",
+        "tradesCount": 6,
+        "assetsCount": 2,
+        "totalVolume": 84500000,
+        "netPnL": 14200000,
+        "trades": []
+      }
+    ],
+    "watchlist": [
+      "BTC/TMN",
+      "ETH/TMN",
+      "TON/TMN",
+      "ICP/TMN",
+      "SOL/USDT"
+    ],
+    "notes": "استراتژی ورود پله‌ای روی حمایت‌های فیبوناچی ۰.۶۱۸ - خروج در سطوح مقاومت روزانه"
+  }
+]
