@@ -98,7 +98,8 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
   const [marginEntryPrice, setMarginEntryPrice] = useState('');
   const [marginExitPrice, setMarginExitPrice] = useState('');
   const [marginCollateral, setMarginCollateral] = useState('10000000'); // default 10M Toman
-  const [marginLeverage, setMarginLeverage] = useState<number>(10);
+  const [marginLeverageInput, setMarginLeverageInput] = useState<string>('10');
+  const [marginLeverageMode, setMarginLeverageMode] = useState<'RATIO' | 'PERCENT'>('RATIO');
   const [marginDurationHours, setMarginDurationHours] = useState('8');
   const [marginCurrency, setMarginCurrency] = useState<'TMN' | 'USD'>('TMN');
   const [marginNote, setMarginNote] = useState('');
@@ -151,10 +152,15 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
     const entry = parseFloat(marginEntryPrice) || 0;
     const exit = parseFloat(marginExitPrice) || 0;
     const collateral = parseFloat(marginCollateral) || 0;
-    const hours = Math.max(0.1, parseFloat(marginDurationHours) || 0);
+    const hours = Math.max(0, parseFloat(marginDurationHours) || 0);
+
+    const rawLev = parseFloat(marginLeverageInput) || 1;
+    const effectiveLeverage = marginLeverageMode === 'PERCENT'
+      ? Math.max(0.01, rawLev / 100)
+      : Math.max(0.01, rawLev);
 
     // 1. Total Volume = Initial Collateral * Leverage Ratio
-    const totalVolume = collateral * marginLeverage;
+    const totalVolume = collateral * effectiveLeverage;
 
     // 2. 4-Hour Periods count
     const fourHourPeriodsCount = Math.max(1, Math.ceil(hours / 4));
@@ -206,7 +212,7 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
       isWin,
       hasValidPrices: entry > 0 && exit > 0 && collateral > 0,
     };
-  }, [marginEntryPrice, marginExitPrice, marginCollateral, marginLeverage, marginDurationHours, marginPosType]);
+  }, [marginEntryPrice, marginExitPrice, marginCollateral, marginLeverageInput, marginLeverageMode, marginDurationHours, marginPosType]);
 
   // Overall Margin Trades Performance Summary
   const marginSummary = useMemo(() => {
@@ -246,12 +252,17 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
     const entry = parseFloat(marginEntryPrice);
     const exit = parseFloat(marginExitPrice);
     const collateral = parseFloat(marginCollateral);
-    const hours = parseFloat(marginDurationHours) || 4;
+    const hours = parseFloat(marginDurationHours);
+    const rawLev = parseFloat(marginLeverageInput);
 
-    if (!entry || entry <= 0 || !exit || exit <= 0 || !collateral || collateral <= 0) {
-      setErrorMsg(isFa ? 'لطفاً قیمت ورود، قیمت خروج و وثیقه اولیه معتبر را وارد نمایید.' : 'Please enter valid entry, exit, and collateral.');
+    if (!entry || entry <= 0 || !exit || exit <= 0 || !collateral || collateral <= 0 || isNaN(hours) || hours < 0 || isNaN(rawLev) || rawLev <= 0) {
+      setErrorMsg(isFa ? 'لطفاً مقادیر معتبر برای قیمت ورود، خروج، وثیقه، نسبت اعتبار و ساعت وارد نمایید.' : 'Please enter valid inputs for prices, collateral, leverage, and duration.');
       return;
     }
+
+    const effectiveLeverage = marginLeverageMode === 'PERCENT'
+      ? Math.max(0.01, rawLev / 100)
+      : Math.max(0.01, rawLev);
 
     setIsSubmittingMargin(true);
     setErrorMsg(null);
@@ -263,7 +274,7 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
       entryPrice: entry,
       exitPrice: exit,
       initialCollateral: collateral,
-      leverageRatio: marginLeverage,
+      leverageRatio: effectiveLeverage,
       totalVolume: marginPreview.totalVolume,
       durationHours: hours,
       fourHourPeriodsCount: marginPreview.fourHourPeriodsCount,
@@ -810,45 +821,118 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                     />
                   </div>
 
-                  {/* 5. Leverage Ratio */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {isFa ? '۴. نسبت اعتبار (اهرم):' : '4. Leverage Ratio:'}
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        value={marginLeverage}
-                        onChange={e => setMarginLeverage(Number(e.target.value))}
-                        className="w-full py-2.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold font-mono focus:ring-2 focus:ring-amber-500"
-                      >
-                        <option value="2">2x (ضریب ۲)</option>
-                        <option value="3">3x (ضریب ۳)</option>
-                        <option value="5">5x (ضریب ۵)</option>
-                        <option value="8">8x (ضریب ۸)</option>
-                        <option value="10">10x (ضریب ۱۰)</option>
-                        <option value="15">15x (ضریب ۱۵)</option>
-                        <option value="20">20x (ضریب ۲۰)</option>
-                      </select>
+                  {/* 5. Leverage / Credit Ratio (Custom Number & Optional % Toggle) */}
+                  <div className="col-span-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {isFa ? '۴. نسبت اعتبار:' : '4. Credit Ratio:'}
+                      </label>
+                      <div className="flex items-center gap-1 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (marginLeverageMode === 'PERCENT') {
+                              const num = parseFloat(marginLeverageInput) || 1000;
+                              setMarginLeverageInput(String(Math.round(num / 100)));
+                              setMarginLeverageMode('RATIO');
+                            }
+                          }}
+                          className={`px-1.5 py-0.5 rounded font-bold transition cursor-pointer ${
+                            marginLeverageMode === 'RATIO'
+                              ? 'bg-amber-500 text-white'
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          {isFa ? 'ضریب (x)' : 'Ratio'}
+                        </button>
+                        <span className="text-slate-300 dark:text-slate-700">/</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (marginLeverageMode === 'RATIO') {
+                              const num = parseFloat(marginLeverageInput) || 10;
+                              setMarginLeverageInput(String(Math.round(num * 100)));
+                              setMarginLeverageMode('PERCENT');
+                            }
+                          }}
+                          className={`px-1.5 py-0.5 rounded font-bold transition cursor-pointer ${
+                            marginLeverageMode === 'PERCENT'
+                              ? 'bg-amber-500 text-white'
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          {isFa ? 'درصد (%)' : 'Percent'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0.01"
+                        required
+                        value={marginLeverageInput}
+                        onChange={e => setMarginLeverageInput(e.target.value)}
+                        placeholder={marginLeverageMode === 'RATIO' ? 'مثلاً 10' : 'مثلاً 1000'}
+                        className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 pe-7"
+                      />
+                      <span className="absolute top-1/2 -translate-y-1/2 end-2 text-xs font-bold text-slate-400 font-mono">
+                        {marginLeverageMode === 'RATIO' ? 'x' : '%'}
+                      </span>
+                    </div>
+                    {/* Quick presets */}
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {(marginLeverageMode === 'RATIO' ? ['2', '3', '5', '8', '10', '15', '20'] : ['200', '300', '500', '800', '1000', '1500', '2000']).map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setMarginLeverageInput(val)}
+                          className={`px-1 py-0.5 rounded text-[9px] font-mono font-bold transition cursor-pointer ${
+                            marginLeverageInput === val
+                              ? 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {val}{marginLeverageMode === 'RATIO' ? 'x' : '%'}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* 6. Duration Hours */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {/* 6. Duration Hours (Custom Open Number with step="any") */}
+                  <div className="col-span-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {isFa ? '۵. مدت زمان (ساعت):' : '5. Duration (Hours):'}
                     </label>
                     <div className="relative">
                       <input
                         type="number"
-                        min="0.1"
-                        step="0.5"
+                        min="0"
+                        step="any"
                         required
                         value={marginDurationHours}
                         onChange={e => setMarginDurationHours(e.target.value)}
-                        placeholder="8"
+                        placeholder="مثلاً 8 یا 24"
                         className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 pe-8"
                       />
                       <Clock className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-2.5 text-slate-400" />
+                    </div>
+                    {/* Quick presets */}
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {['1', '4', '8', '12', '24', '48', '72'].map(h => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setMarginDurationHours(h)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition cursor-pointer ${
+                            marginDurationHours === h
+                              ? 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {h}{isFa ? 'س' : 'h'}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
