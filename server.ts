@@ -750,6 +750,7 @@ interface StoredUser {
     lesson: string;
     strategyTag: string;
   }>;
+  marginTrades?: Array<any>;
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -836,6 +837,80 @@ function getInitialDemoUser(): StoredUser {
         strategyTag: "Pullback",
       }
     ],
+    marginTrades: [
+      {
+        id: "mrg_01",
+        symbol: "BTC/TMN",
+        positionType: "LONG",
+        entryPrice: 6400000000,
+        exitPrice: 6650000000,
+        initialCollateral: 10000000,
+        leverageRatio: 10,
+        totalVolume: 100000000,
+        durationHours: 8,
+        fourHourPeriodsCount: 2,
+        activationFee: 15000,
+        holdingFee: 30000,
+        entryFee: 250000,
+        exitFee: 250000,
+        totalFees: 545000,
+        grossPnL: 3906250,
+        netPnL: 3361250,
+        roePercent: 33.61,
+        isWin: true,
+        date: new Date(Date.now() - 86400000).toISOString(),
+        currency: "TMN",
+        note: "ورود پله‌ای با اهرم ۱۰ بر روی حمایت معتبر بیت‌کوین",
+      },
+      {
+        id: "mrg_02",
+        symbol: "ETH/TMN",
+        positionType: "SHORT",
+        entryPrice: 230000000,
+        exitPrice: 222000000,
+        initialCollateral: 5000000,
+        leverageRatio: 5,
+        totalVolume: 25000000,
+        durationHours: 4,
+        fourHourPeriodsCount: 1,
+        activationFee: 3750,
+        holdingFee: 3750,
+        entryFee: 62500,
+        exitFee: 62500,
+        totalFees: 132500,
+        grossPnL: 869565,
+        netPnL: 737065,
+        roePercent: 14.74,
+        isWin: true,
+        date: new Date(Date.now() - 43200000).toISOString(),
+        currency: "TMN",
+        note: "موقعیت فروش تعهدی اتریوم در مقاومت کانال",
+      },
+      {
+        id: "mrg_03",
+        symbol: "TON/TMN",
+        positionType: "LONG",
+        entryPrice: 450000,
+        exitPrice: 438000,
+        initialCollateral: 4000000,
+        leverageRatio: 8,
+        totalVolume: 32000000,
+        durationHours: 12,
+        fourHourPeriodsCount: 3,
+        activationFee: 4800,
+        holdingFee: 14400,
+        entryFee: 80000,
+        exitFee: 80000,
+        totalFees: 179200,
+        grossPnL: -853333,
+        netPnL: -1032533,
+        roePercent: -25.81,
+        isWin: false,
+        date: new Date(Date.now() - 18000000).toISOString(),
+        currency: "TMN",
+        note: "حد ضرر فعال شد به دلیل شکست خط روند ۴ ساعته",
+      }
+    ],
   };
 }
 
@@ -850,8 +925,12 @@ function loadUsers(): Map<string, StoredUser> {
       const list: StoredUser[] = JSON.parse(content);
       const map = new Map<string, StoredUser>();
       for (const u of list) {
+        if (!u.marginTrades) {
+          u.marginTrades = getInitialDemoUser().marginTrades;
+        }
         map.set(u.email.toLowerCase(), u);
       }
+      saveUsers(map);
       return map;
     }
   } catch (err) {
@@ -1067,7 +1146,7 @@ app.put("/api/user/profile", (req, res) => {
     return res.status(401).json({ success: false, error: "عدم دسترسی." });
   }
 
-  const { name, watchlist, notes, wallexApi, alerts, journalEntries, phoneNumber } = req.body;
+  const { name, watchlist, notes, wallexApi, alerts, journalEntries, phoneNumber, marginTrades } = req.body;
   if (name !== undefined) user.name = String(name).trim();
   if (Array.isArray(watchlist)) user.watchlist = watchlist;
   if (notes !== undefined) user.notes = String(notes);
@@ -1081,6 +1160,7 @@ app.put("/api/user/profile", (req, res) => {
   }
   if (Array.isArray(alerts)) user.alerts = alerts;
   if (Array.isArray(journalEntries)) user.journalEntries = journalEntries;
+  if (Array.isArray(marginTrades)) user.marginTrades = marginTrades;
 
   saveUsers(inMemoryUsers);
 

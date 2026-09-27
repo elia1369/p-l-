@@ -121,14 +121,31 @@ export interface PriceAlert {
   isActive: boolean;
 }
 
-export interface TaxFiscalYearReport {
-  year: string;
-  totalGrossProfit: number;
-  totalGrossLoss: number;
-  netTaxableGain: number;
-  totalTradingFeesDeduction: number;
-  estimatedTaxPayable: number;
-  taxBracketPercent: number;
+export type MarginPositionType = 'LONG' | 'SHORT';
+
+export interface MarginTrade {
+  id: string;
+  symbol: string;
+  positionType: MarginPositionType;
+  entryPrice: number;
+  exitPrice: number;
+  initialCollateral: number;
+  leverageRatio: number;
+  totalVolume: number;
+  durationHours: number;
+  fourHourPeriodsCount: number;
+  activationFee: number;
+  holdingFee: number;
+  entryFee: number;
+  exitFee: number;
+  totalFees: number;
+  grossPnL: number;
+  netPnL: number;
+  roePercent: number;
+  isWin: boolean;
+  date: string;
+  currency: CurrencyKind;
+  note?: string;
 }
 
 export interface WallexApiConfig {
@@ -165,4 +182,5 @@ export interface UserProfile {
   wallexApi?: WallexApiConfig;
   alerts?: PriceAlert[];
   journalEntries?: TradeJournalEntry[];
+  marginTrades?: MarginTrade[];
 }
