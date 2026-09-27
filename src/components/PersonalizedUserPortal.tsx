@@ -880,23 +880,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                         {marginLeverageMode === 'RATIO' ? 'x' : '%'}
                       </span>
                     </div>
-                    {/* Quick presets */}
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      {(marginLeverageMode === 'RATIO' ? ['2', '3', '5', '8', '10', '15', '20'] : ['200', '300', '500', '800', '1000', '1500', '2000']).map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setMarginLeverageInput(val)}
-                          className={`px-1 py-0.5 rounded text-[9px] font-mono font-bold transition cursor-pointer ${
-                            marginLeverageInput === val
-                              ? 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          {val}{marginLeverageMode === 'RATIO' ? 'x' : '%'}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   {/* 6. Duration Hours (Custom Open Number with step="any") */}
@@ -916,23 +899,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                         className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 pe-8"
                       />
                       <Clock className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-2.5 text-slate-400" />
-                    </div>
-                    {/* Quick presets */}
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      {['1', '4', '8', '12', '24', '48', '72'].map(h => (
-                        <button
-                          key={h}
-                          type="button"
-                          onClick={() => setMarginDurationHours(h)}
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition cursor-pointer ${
-                            marginDurationHours === h
-                              ? 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          {h}{isFa ? 'س' : 'h'}
-                        </button>
-                      ))}
                     </div>
                   </div>
                 </div>
