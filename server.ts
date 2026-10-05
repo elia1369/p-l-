@@ -39,21 +39,36 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Proxy endpoint for Wallex Live Markets API: GET /hector/web/v1/markets
-app.get(["/hector/web/v1/markets", "/api/wallex/markets"], async (_req, res) => {
+// Proxy endpoint for Wallex Live Markets API: GET /v1/markets or /hector/web/v1/markets
+app.get(["/v1/markets", "/hector/web/v1/markets", "/api/wallex/markets"], async (_req, res) => {
   try {
-    const response = await fetch("https://api.wallex.ir/hector/web/v1/markets", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
-        "Accept": "application/json",
-      },
-    });
+    const endpoints = [
+      "https://api.wallex.ir/v1/markets",
+      "https://api.wallex.ir/hector/web/v1/markets",
+    ];
 
-    if (!response.ok) {
-      throw new Error(`Wallex API responded with HTTP ${response.status}`);
+    let data: any = null;
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
+            "Accept": "application/json",
+          },
+        });
+        if (response.ok) {
+          data = await response.json();
+          break;
+        }
+      } catch {
+        // try next
+      }
     }
 
-    const data = await response.json();
+    if (!data) {
+      throw new Error("Wallex Markets API unreachable");
+    }
+
     res.setHeader("Cache-Control", "public, max-age=10");
     res.json(data);
   } catch (error: any) {
@@ -61,6 +76,88 @@ app.get(["/hector/web/v1/markets", "/api/wallex/markets"], async (_req, res) => 
     res.status(502).json({
       success: false,
       error: "خطا در دریافت نرخ‌های لحظه‌ای والکس (Failed to fetch Wallex live markets).",
+      details: error?.message,
+    });
+  }
+});
+
+// Proxy endpoint for Wallex Account Balances API: GET /v1/account/balances
+app.all("/api/wallex/account/balances", async (req, res) => {
+  try {
+    const apiKey = (req.headers["x-api-key"] as string) || req.body?.apiKey || (req.query?.apiKey as string);
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: "کلید x-api-key ارسال نشده است (x-api-key header missing).",
+      });
+    }
+
+    const response = await fetch("https://api.wallex.ir/v1/account/balances", {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Failed to proxy Wallex account balances:", error?.message || error);
+    res.status(502).json({
+      success: false,
+      error: "خطا در ارتباط با وب‌سرویس موجودی والکس (Wallex Balances API error).",
+      details: error?.message,
+    });
+  }
+});
+
+// Proxy endpoint for Wallex Account Trades API: GET /v1/account/trades?symbol=[SYMBOL]
+app.all("/api/wallex/account/trades", async (req, res) => {
+  try {
+    const apiKey = (req.headers["x-api-key"] as string) || req.body?.apiKey || (req.query?.apiKey as string);
+    const symbol = (req.query?.symbol as string) || req.body?.symbol;
+
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: "کلید x-api-key ارسال نشده است (x-api-key header missing).",
+      });
+    }
+
+    const queryParams = new URLSearchParams();
+    if (symbol) queryParams.set("symbol", String(symbol));
+    if (req.query?.page) queryParams.set("page", String(req.query.page));
+    if (req.query?.per_page) queryParams.set("per_page", String(req.query.per_page));
+
+    const qs = queryParams.toString();
+    const url = `https://api.wallex.ir/v1/account/trades${qs ? `?${qs}` : ""}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Failed to proxy Wallex account trades:", error?.message || error);
+    res.status(502).json({
+      success: false,
+      error: "خطا در ارتباط با وب‌سرویس معاملات والکس (Wallex Trades API error).",
       details: error?.message,
     });
   }

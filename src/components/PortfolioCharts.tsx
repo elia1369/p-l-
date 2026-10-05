@@ -278,9 +278,6 @@ export const PortfolioCharts: React.FC<Props> = ({ assets, trades, lang }) => {
             <TrendingUp className="w-5 h-5 text-blue-500" />
             <span>{t.chartsTitle}</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {t.chartsSubtitle}
-          </p>
         </div>
       </div>
 

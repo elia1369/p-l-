@@ -1,20 +1,19 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { 
-  UploadCloud, 
+  Key, 
   FileSpreadsheet, 
-  Download, 
-  Sparkles, 
-  ShieldCheck, 
-  AlertCircle,
   Camera,
-  ClipboardPaste
+  ClipboardPaste,
+  Sparkles
 } from 'lucide-react';
-import { Language, AssetAnalysis, TradeRecord, CurrencyKind } from '../types';
+import { Language, AssetAnalysis, TradeRecord, CurrencyKind, PIIReport } from '../types';
 import { translations } from '../utils/i18n';
 import { downloadExcelTemplate } from '../utils/excelParser';
 import { CurrentPricePnLBox } from './CurrentPricePnLBox';
 import { ImageTradeExtractorCard } from './ImageTradeExtractorCard';
 import { ManualBatchInputCard } from './ManualBatchInputCard';
+import { FileUploader } from './ui/file-uploader';
+import { ExchangeApiInputHub } from './ExchangeApiInputHub';
 
 interface Props {
   lang: Language;
@@ -26,6 +25,9 @@ interface Props {
   customPrices?: Record<string, number>;
   onUpdatePrice?: (symbol: string, newPrice: number) => void;
   onApplyManualData?: (trades: TradeRecord[], symbol: string, currency: CurrencyKind) => void;
+  onTradesSyncedFromApi?: (trades: TradeRecord[], exchangeName: string, currency: CurrencyKind) => void;
+  onOpenPiiModal?: () => void;
+  piiReport?: PIIReport | null;
 }
 
 export const FileUploadArea: React.FC<Props> = ({
@@ -38,24 +40,19 @@ export const FileUploadArea: React.FC<Props> = ({
   customPrices = {},
   onUpdatePrice,
   onApplyManualData,
+  onTradesSyncedFromApi,
+  onOpenPiiModal,
+  piiReport,
 }) => {
+  const isRtl = lang === 'fa';
   const t = translations[lang];
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'EXCEL' | 'IMAGE_OCR'>('IMAGE_OCR');
+  
+  // Default and Primary tab is now API Connection
+  const [activeTab, setActiveTab] = useState<'API' | 'EXCEL' | 'IMAGE_OCR'>('API');
   const [showManualTextFallback, setShowManualTextFallback] = useState(false);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const processFile = (file: File) => {
+  const handleFileProcess = (file: File) => {
     setErrorMessage(null);
     const validExtensions = ['.xlsx', '.xls', '.csv'];
     const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
@@ -72,122 +69,78 @@ export const FileUploadArea: React.FC<Props> = ({
     onFileSelected(file);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      processFile(e.target.files[0]);
-    }
-  };
-
   return (
-    <div className="w-full space-y-4">
-      {/* Top Method Switcher: Excel Upload vs AI Image OCR */}
+    <div className="w-full space-y-5">
+      {/* Top Mode Selector Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 pb-3">
-        <div className="inline-flex p-1 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="inline-flex p-1.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-sm gap-1">
+          {/* Primary Option: Exchange API & Private Key */}
           <button
-            id="tab-image-ocr"
+            id="tab-exchange-api"
             type="button"
-            onClick={() => setActiveTab('IMAGE_OCR')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-              activeTab === 'IMAGE_OCR'
-                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/30'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            onClick={() => setActiveTab('API')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+              activeTab === 'API'
+                ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-md shadow-emerald-600/25 ring-2 ring-emerald-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
             }`}
           >
-            <Camera className="w-4 h-4" />
-            <span>{t.tabManualInput}</span>
+            <Key className="w-4 h-4" />
+            <span>{isRtl ? 'اتصال با کلید خصوصی' : 'Private API Key'}</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-white/20 text-white font-mono">
+              {isRtl ? 'پیش‌فرض' : 'Default'}
+            </span>
           </button>
 
+          {/* Backup Option 1: Excel File */}
           <button
             id="tab-excel-upload"
             type="button"
             onClick={() => setActiveTab('EXCEL')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'EXCEL'
-                ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-xs shadow-sky-600/30'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md shadow-sky-600/25'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>{t.tabExcelUpload}</span>
+            <span>{isRtl ? 'فایل اکسل' : 'Excel File'}</span>
+          </button>
+
+          {/* Backup Option 2: Image OCR */}
+          <button
+            id="tab-image-ocr"
+            type="button"
+            onClick={() => setActiveTab('IMAGE_OCR')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'IMAGE_OCR'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/25'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            <span>{isRtl ? 'تصویر و ثبت دستی' : 'Image & Manual'}</span>
           </button>
         </div>
       </div>
 
-      {activeTab === 'EXCEL' ? (
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
-            className="hidden"
-            onChange={handleInputChange}
+      {/* Tab 1: Primary API Key & Secret Hub */}
+      {activeTab === 'API' && (
+        <div className="space-y-4">
+          <ExchangeApiInputHub
+            lang={lang}
+            isLoading={isLoading}
+            onLoadDemo={onLoadDemo}
+            onOpenPiiModal={onOpenPiiModal}
+            piiReport={piiReport}
+            onTradesSynced={(syncedTrades, exchangeName, currency) => {
+              if (onTradesSyncedFromApi) {
+                onTradesSyncedFromApi(syncedTrades, exchangeName, currency);
+              } else if (onApplyManualData) {
+                onApplyManualData(syncedTrades, exchangeName, currency);
+              }
+            }}
           />
-
-          <div
-            id="excel-dropzone"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center transition-all cursor-pointer backdrop-blur-md ${
-              isDragging
-                ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 scale-[1.008]'
-                : 'border-sky-500/30 dark:border-sky-500/20 hover:border-sky-500/60 bg-white/70 dark:bg-slate-900/60 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col items-center justify-center max-w-lg mx-auto">
-              {/* Main Icon */}
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-cyan-500/15 to-blue-500/10 dark:from-sky-500/25 dark:to-blue-500/15 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-4 transition-transform group-hover:scale-105 shadow-sm shadow-sky-500/10">
-                <UploadCloud className="w-8 h-8" />
-              </div>
-
-              {fileName && (
-                <div className="mb-4 px-3 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-mono text-xs font-bold border border-sky-200 dark:border-sky-800">
-                  {t.fileLoaded}: {fileName}
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
-                <button
-                  id="browse-file-btn"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-md shadow-sky-600/25 transition cursor-pointer"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>{t.uploadBtn}</span>
-                </button>
-
-                <button
-                  id="download-template-btn"
-                  type="button"
-                  onClick={downloadExcelTemplate}
-                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 text-xs sm:text-sm font-medium transition cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>{t.downloadTemplateBtn}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Error Feedback */}
-            {errorMessage && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-center gap-2 max-w-md mx-auto">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-          </div>
 
           {/* Dedicated Section for Current Price Input & Automatic P&L Comparison */}
           <CurrentPricePnLBox
@@ -198,9 +151,41 @@ export const FileUploadArea: React.FC<Props> = ({
             onLoadDemo={onLoadDemo}
             isExcelLoaded={Boolean(fileName || (assets && assets.length > 0))}
           />
-        </>
-      ) : (
-        /* AI Image OCR & Auto Calculation Mode */
+        </div>
+      )}
+
+      {/* Tab 2: Excel Dropzone Fallback */}
+      {activeTab === 'EXCEL' && (
+        <div className="space-y-4">
+          <FileUploader
+            id="excel-dropzone"
+            accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
+            maxSizeMB={25}
+            isLoading={isLoading}
+            fileName={fileName}
+            errorMessage={errorMessage}
+            onFileSelect={handleFileProcess}
+            onDownloadTemplate={downloadExcelTemplate}
+            title={t.uploadZoneTitle}
+            description={t.uploadZoneDesc}
+            uploadButtonText={t.uploadBtn}
+            downloadButtonText={t.downloadTemplateBtn}
+            isRtl={lang === 'fa'}
+          />
+
+          <CurrentPricePnLBox
+            assets={assets}
+            lang={lang}
+            customPrices={customPrices}
+            onUpdatePrice={onUpdatePrice}
+            onLoadDemo={onLoadDemo}
+            isExcelLoaded={Boolean(fileName || (assets && assets.length > 0))}
+          />
+        </div>
+      )}
+
+      {/* Tab 3: AI Image OCR & Manual Trade Input Fallback */}
+      {activeTab === 'IMAGE_OCR' && (
         <div className="space-y-4">
           <ImageTradeExtractorCard
             lang={lang}
@@ -213,7 +198,6 @@ export const FileUploadArea: React.FC<Props> = ({
             onUpdatePrice={onUpdatePrice}
           />
 
-          {/* Optional Fallback to Text Copy-Paste */}
           <div className="text-center pt-2">
             <button
               type="button"

@@ -657,9 +657,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                 }`}>
                   {marginSummary.totalNetPnL >= 0 ? '+' : ''}{marginSummary.totalNetPnL.toLocaleString()} {isFa ? 'تومان' : 'TMN'}
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  {isFa ? 'پس از کسر دقیق تمام کارمزدها' : 'After all fees deducted'}
-                </div>
               </div>
 
               {/* 2. Win Rate */}
@@ -687,9 +684,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                 <div className="text-base sm:text-lg font-mono font-black text-indigo-600 dark:text-indigo-400">
                   {marginSummary.totalFeesPaid.toLocaleString()} {isFa ? 'تومان' : 'TMN'}
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  {isFa ? 'فعال‌سازی + تمدید ۴ساعته + ورود/خروج' : 'Activation + 4h Hold + Trades'}
-                </div>
               </div>
 
               {/* 4. Total Volume Traded */}
@@ -700,9 +694,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                 </div>
                 <div className="text-base sm:text-lg font-mono font-black text-slate-900 dark:text-slate-100">
                   {marginSummary.totalVolumeTraded.toLocaleString()} {isFa ? 'تومان' : 'TMN'}
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  {isFa ? `از ${marginSummary.totalCollateralCommitted.toLocaleString()} وثیقه` : 'Committed collateral'}
                 </div>
               </div>
             </div>
@@ -718,11 +709,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                     <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
                       {isFa ? 'ثبت و محاسبه دقیق معامله تعهدی جدید (Wallex Margin)' : 'Record & Calculate New Margin Trade'}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {isFa 
-                        ? 'محاسبه خودکار حجم کل از روی وثیقه و نسبت اعتبار، کارمزد فعال‌سازی (۰.۰۱۵٪)، هزینه نگهداری هر ۴ ساعت (۰.۰۱۵٪) و کارمزدهای ورود و خروج (هر کدام ۰.۲۵٪).'
-                        : 'Auto-calculates total volume, 0.015% activation fee, 0.015% per 4h hold fee, and 0.25% trade fees.'}
-                    </p>
                   </div>
                 </div>
 
@@ -821,50 +807,11 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                     />
                   </div>
 
-                  {/* 5. Leverage / Credit Ratio (Custom Number & Optional % Toggle) */}
+                  {/* 5. Leverage / Credit Ratio */}
                   <div className="col-span-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                        {isFa ? '۴. نسبت اعتبار:' : '4. Credit Ratio:'}
-                      </label>
-                      <div className="flex items-center gap-1 text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (marginLeverageMode === 'PERCENT') {
-                              const num = parseFloat(marginLeverageInput) || 1000;
-                              setMarginLeverageInput(String(Math.round(num / 100)));
-                              setMarginLeverageMode('RATIO');
-                            }
-                          }}
-                          className={`px-1.5 py-0.5 rounded font-bold transition cursor-pointer ${
-                            marginLeverageMode === 'RATIO'
-                              ? 'bg-amber-500 text-white'
-                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                          }`}
-                        >
-                          {isFa ? 'ضریب (x)' : 'Ratio'}
-                        </button>
-                        <span className="text-slate-300 dark:text-slate-700">/</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (marginLeverageMode === 'RATIO') {
-                              const num = parseFloat(marginLeverageInput) || 10;
-                              setMarginLeverageInput(String(Math.round(num * 100)));
-                              setMarginLeverageMode('PERCENT');
-                            }
-                          }}
-                          className={`px-1.5 py-0.5 rounded font-bold transition cursor-pointer ${
-                            marginLeverageMode === 'PERCENT'
-                              ? 'bg-amber-500 text-white'
-                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                          }`}
-                        >
-                          {isFa ? 'درصد (%)' : 'Percent'}
-                        </button>
-                      </div>
-                    </div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      {isFa ? '۴. نسبت اعتبار:' : '4. Credit Ratio:'}
+                    </label>
                     <div className="relative">
                       <input
                         type="number"
@@ -873,7 +820,7 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                         required
                         value={marginLeverageInput}
                         onChange={e => setMarginLeverageInput(e.target.value)}
-                        placeholder={marginLeverageMode === 'RATIO' ? 'مثلاً 10' : 'مثلاً 1000'}
+                        placeholder="مثلاً 10"
                         className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 pe-7"
                       />
                       <span className="absolute top-1/2 -translate-y-1/2 end-2 text-xs font-bold text-slate-400 font-mono">
@@ -884,7 +831,7 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
 
                   {/* 6. Duration Hours (Custom Open Number with step="any") */}
                   <div className="col-span-1">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       {isFa ? '۵. مدت زمان (ساعت):' : '5. Duration (Hours):'}
                     </label>
                     <div className="relative">
@@ -914,7 +861,6 @@ export const PersonalizedUserPortal: React.FC<Props> = ({
                     </div>
 
                     <div className="text-xs font-mono">
-                      <span className="text-slate-500">{isFa ? 'حجم کل موقعیت (وثیقه × اهرم): ' : 'Total Volume: '}</span>
                       <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
                         {marginPreview.totalVolume.toLocaleString()} {isFa ? 'تومان' : 'TMN'}
                       </span>

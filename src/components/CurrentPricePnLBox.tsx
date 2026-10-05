@@ -388,11 +388,6 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                       {activeWallexMarket.fa_base_asset && (
                         <span className="text-slate-600 dark:text-slate-300 font-medium">({activeWallexMarket.fa_base_asset})</span>
                       )}
-                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <Activity className="w-3 h-3" />
-                        <span>{lang === 'fa' ? 'ثبت خودکار از API والکس' : 'Auto-filled via Wallex API'}</span>
-                      </span>
                     </div>
 
                     {isManualOverride && lastLivePriceFetched && (

@@ -43,9 +43,6 @@ export const AssetAnalyzer: React.FC<Props> = ({
             <Calculator className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             <span>{t.assetAnalysisTitle}</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {t.assetAnalysisSubtitle}
-          </p>
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 self-start sm:self-auto bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg">
           {assets.length} {lang === 'fa' ? 'دارایی تحلیل‌شده' : 'Analyzed Assets'}
