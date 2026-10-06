@@ -5,7 +5,7 @@ import { detectCurrency } from './i18n';
  * Ensures fees are realistic and not accidentally multiplied by price or corrupted.
  * If fee is 0 (or not specified in the Excel row), calculates using the standard exchange fee formula (0.2%).
  */
-export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number }): number {
+export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number; currency?: string; symbol?: string }): number {
   const p = Number(trade.price) || 0;
   const q = Number(trade.quantity) || 0;
   const gross = p * q;
@@ -24,7 +24,9 @@ export function getSanitizedTradeFee(trade: { price: number; quantity: number; f
       fee = gross * 0.002; // standard 0.2% fee fallback
     }
   }
-  return Number(fee.toFixed(2));
+
+  const isToman = detectCurrency(trade.symbol || trade.currency) === 'TMN';
+  return isToman ? Number(fee.toFixed(0)) : Number(fee.toFixed(6));
 }
 
 /**
@@ -102,7 +104,29 @@ export function calculateAssetAnalyses(
     const totalFees = buyFees + sellFees;
     const avgBuyPrice = totalBuyQty > 0 ? totalBuyCost / totalBuyQty : 0;
     const avgSellPrice = totalSellQty > 0 ? totalSellRevenue / totalSellQty : 0;
-    const netQty = totalBuyQty - totalSellQty;
+    
+    // Calculate exact sold ratio and percentages
+    const rawNetQty = totalBuyQty - totalSellQty;
+    const soldRatio = totalBuyQty > 0 ? (totalSellQty / totalBuyQty) : (totalSellQty > 0 ? 1 : 0);
+    
+    const isUsd = detectCurrency(symbol) === 'USD';
+    const remainingEstimatedValue = rawNetQty > 0 ? rawNetQty * (avgBuyPrice || avgSellPrice) : 0;
+    const isDustHolding = rawNetQty > 0 && (
+      (isUsd && remainingEstimatedValue < 0.50) || 
+      (!isUsd && remainingEstimatedValue < 30000)
+    );
+
+    // Position is closed if:
+    // 1. rawNetQty <= 0.0001 (all bought quantity or more was sold)
+    // 2. OR >= 96% of bought volume was sold (remaining <= 4% is trading fee residue / exchange dust)
+    // 3. OR rawNetQty is virtually zero
+    // 4. OR totalBuyQty === 0 && totalSellQty > 0
+    // 5. OR remaining holding value is trivial dust (< $0.50 or < 30,000 TMN)
+    const isClosed = rawNetQty <= 0.0001 || soldRatio >= 0.96 || Math.abs(rawNetQty) < 0.000001 || totalBuyQty === 0 || isDustHolding;
+    const netQty = isClosed ? 0 : Number(rawNetQty.toFixed(8));
+    
+    const soldPercentage = isClosed ? 100 : Math.min(100, Math.max(0, soldRatio * 100));
+    const remainingPercentage = isClosed ? 0 : Math.max(0, 100 - soldPercentage);
 
     // FIFO Sequential matching algorithm for accurate Realized P&L:
     // Tracks open buy inventory lots with remaining quantity, unit price, and fee basis
@@ -164,17 +188,14 @@ export function calculateAssetAnalyses(
     });
 
     // Unsold position and remaining fees for open lots
-    const remainingOpenFees = buyQueue.reduce((sum, lot) => sum + (lot.remainingQty * lot.unitFee), 0);
-    const remainingOpenCost = buyQueue.reduce((sum, lot) => sum + (lot.remainingQty * lot.price), 0);
+    const remainingOpenFees = isClosed ? 0 : buyQueue.reduce((sum, lot) => sum + (lot.remainingQty * lot.unitFee), 0);
+    const remainingOpenCost = isClosed ? 0 : buyQueue.reduce((sum, lot) => sum + (lot.remainingQty * lot.price), 0);
 
     // Breakeven price calculation:
     // Breakeven price = (Unsold cost basis + unrecovered buy fees + anticipated exit fee) / remaining net quantity
     let breakevenPrice = 0;
-    if (netQty > 0.000001) {
+    if (!isClosed && netQty > 0.000001) {
       breakevenPrice = (remainingOpenCost + remainingOpenFees) / netQty;
-    } else if (netQty < -0.000001) {
-      // Short position breakeven
-      breakevenPrice = avgSellPrice;
     } else {
       // Fully closed: breakeven is effectively the avg buy price
       breakevenPrice = avgBuyPrice || avgSellPrice;
@@ -190,15 +211,13 @@ export function calculateAssetAnalyses(
     }
 
     // Unrealized P&L on remaining open positions:
-    // Market value of open lots - (Cost basis + open buy fees)
+    // If position is closed, unrealized is strictly 0
     let unrealizedPnL = 0;
-    if (netQty > 0.000001) {
+    if (!isClosed && netQty > 0.000001) {
       unrealizedPnL = (currentPrice * netQty) - (remainingOpenCost + remainingOpenFees);
-    } else if (netQty < -0.000001) {
-      unrealizedPnL = (breakevenPrice - currentPrice) * Math.abs(netQty);
     }
 
-    const netPnL = realizedPnL + unrealizedPnL;
+    const netPnL = isClosed ? realizedPnL : (realizedPnL + unrealizedPnL);
     const capitalBase = totalBuyCost > 0 ? totalBuyCost : totalSellRevenue;
     const roiPercent = capitalBase > 0 ? (netPnL / capitalBase) * 100 : 0;
 
@@ -219,6 +238,9 @@ export function calculateAssetAnalyses(
       sellFees,
       totalFees,
       netQty,
+      isClosed,
+      soldPercentage,
+      remainingPercentage,
       breakevenPrice,
       currentPrice,
       realizedPnL,
@@ -270,7 +292,7 @@ export function calculatePortfolioSummary(
   assetAnalyses.forEach(asset => {
     realizedPnL += asset.realizedPnL;
     unrealizedPnL += asset.unrealizedPnL;
-    if (Math.abs(asset.netQty) > 0.0001) {
+    if (!asset.isClosed && asset.netQty > 0.0001) {
       openPositionsCount++;
     }
     if (asset.netPnL > 0.01) {

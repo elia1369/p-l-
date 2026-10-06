@@ -203,30 +203,6 @@ export const FileUploader = React.forwardRef<HTMLDivElement, FileUploaderProps>(
                 : "Drop your Excel trade report file here")}
           </h3>
 
-          <p className="mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-            {description ||
-              (isRtl
-                ? "یا برای انتخاب فایل از رایانه خود کلیک نمایید"
-                : "or click to browse from your device")}
-          </p>
-
-          {/* Supported Format Chips (shadcn badges) */}
-          <div className="mt-3.5 flex flex-wrap items-center justify-center gap-1.5">
-            <Badge variant="outline" className="text-[11px] font-mono uppercase bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
-              <FileType className="w-3 h-3 mr-1 inline opacity-60" />
-              .XLSX
-            </Badge>
-            <Badge variant="outline" className="text-[11px] font-mono uppercase bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
-              .XLS
-            </Badge>
-            <Badge variant="outline" className="text-[11px] font-mono uppercase bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
-              .CSV
-            </Badge>
-            <Badge variant="secondary" className="text-[11px] text-slate-500 dark:text-slate-400">
-              {isRtl ? `حداکثر ${maxSizeMB}MB` : `Max ${maxSizeMB}MB`}
-            </Badge>
-          </div>
-
           {/* Loaded File Card Preview (if a file is selected) */}
           {fileName && (
             <div
@@ -290,7 +266,7 @@ export const FileUploader = React.forwardRef<HTMLDivElement, FileUploaderProps>(
 
           {/* Action Buttons (shadcn UI Buttons) */}
           <div
-            className="mt-5 flex flex-wrap items-center justify-center gap-3"
+            className="mt-4 flex flex-wrap items-center justify-center gap-3"
             onClick={(e) => e.stopPropagation()}
           >
             <Button
@@ -305,20 +281,6 @@ export const FileUploader = React.forwardRef<HTMLDivElement, FileUploaderProps>(
               <FileSpreadsheet className="h-4 w-4" />
               <span>{uploadButtonText || (isRtl ? "انتخاب فایل اکسل" : "Browse Excel File")}</span>
             </Button>
-
-            {onDownloadTemplate && (
-              <Button
-                id="download-template-btn"
-                type="button"
-                variant="outline"
-                size="default"
-                onClick={onDownloadTemplate}
-                className="gap-2 font-medium border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <Download className="h-4 w-4" />
-                <span>{downloadButtonText || (isRtl ? "دانلود نمونه خام اکسل" : "Download Template")}</span>
-              </Button>
-            )}
           </div>
 
           {/* Error Message banner */}

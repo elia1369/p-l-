@@ -179,22 +179,77 @@ export function normalizeTradingPair(rawSymbol: string, rawQuote?: string): stri
   return `${cleanBase || 'ASSET'}/TMN`;
 }
 
-function parseNumber(value: any): number {
+export function parseNumber(value: any): number {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return isNaN(value) ? 0 : value;
-  // Strip commas, currency symbols, persian numbers
+
   let str = String(value).trim();
-  // Persian/Arabic digit conversion
+  if (!str) return 0;
+
+  // 1. Convert Persian and Arabic digits to ASCII 0-9
   str = str.replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
   str = str.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
-  str = str.replace(/[,،$€£¥﷼\s]/g, '');
+
+  // 2. Remove currency symbols, units, spaces, and text
+  str = str.replace(/[$€£¥﷼]/g, '')
+           .replace(/\b(usdt|usd|tmn|toman|irt|irr|تومان|تتر|دلار|ریال)\b/gi, '')
+           .replace(/\s+/g, '');
+
+  // 3. Handle Persian Momayyez (٫) -> decimal dot
+  str = str.replace(/٫/g, '.');
+
+  // 4. Handle slash as decimal separator if between digits (e.g. 12/50 -> 12.50)
+  if (/^\d+\/\d+$/.test(str)) {
+    str = str.replace('/', '.');
+  }
+
+  // 5. Detect and normalize thousands separators vs decimal separator
+  const hasDot = str.includes('.');
+  const hasComma = str.includes(',');
+
+  if (hasDot && hasComma) {
+    const lastDot = str.lastIndexOf('.');
+    const lastComma = str.lastIndexOf(',');
+    if (lastDot > lastComma) {
+      // e.g. "1,250,000.50" -> comma is thousand separator, dot is decimal
+      str = str.replace(/,/g, '');
+    } else {
+      // e.g. "1.250.000,50" -> dot is thousand separator, comma is decimal
+      str = str.replace(/\./g, '').replace(',', '.');
+    }
+  } else if (hasComma) {
+    const parts = str.split(',');
+    if (parts.length > 2) {
+      // Multiple commas: e.g. "1,250,000" -> thousand separators
+      str = str.replace(/,/g, '');
+    } else if (parts.length === 2) {
+      const p0 = parts[0];
+      const p1 = parts[1];
+      // If starts with 0 or -0 (e.g. "0,330" or "0,005" or "0,33"): ALWAYS decimal dot!
+      if (p0 === '0' || p0 === '-0' || p0 === '+0') {
+        str = `${p0}.${p1}`;
+      } else if (p1.length !== 3) {
+        // Non-3 digit fraction (e.g. "12,5" or "44,50" or "0,1234"): decimal dot!
+        str = `${p0}.${p1}`;
+      } else {
+        // parts[1].length === 3, e.g. "44,000" or "1,000"
+        // In crypto trading, if p0 < 100 and it looks like a price or rate (e.g. "44,500"),
+        // standard format with single comma and 3 decimals is decimal
+        str = str.replace(/,/g, '');
+      }
+    }
+  }
+
+  // Final cleanup: remove any remaining non-numeric chars except dot, minus, and scientific E
+  str = str.replace(/[^0-9.\-eE]/g, '');
+
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 }
 
 export function parseSideStrict(value: any): TradeSide | null {
   if (value === null || value === undefined || value === '') return null;
-  const str = String(value).toLowerCase().trim();
+  const str = String(value).toLowerCase().trim().replace(/[\s_-]+/g, ' ');
 
   // Explicit negative check - these are NOT trade sides (e.g. Wallex column "اسپات" / Spot)
   if (
@@ -210,7 +265,7 @@ export function parseSideStrict(value: any): TradeSide | null {
     return null;
   }
 
-  // SELL indicators (Exact or strong phrase matches)
+  // Exact SELL indicators
   if (
     str === 'sell' ||
     str === 's' ||
@@ -219,17 +274,17 @@ export function parseSideStrict(value: any): TradeSide | null {
     str === 'فروش (خروجی)' ||
     str === 'خروجی (فروش)' ||
     str === 'خروجی' ||
-    str.includes('sell') ||
-    str.includes('فروش') ||
-    str.includes('خروج') ||
-    str.includes('برداشت') ||
-    str.includes('ask') ||
-    str.includes('short')
+    str === 'فروش آسان' ||
+    str === 'فروش سریع' ||
+    str === 'فروش تعهدی' ||
+    str === 'فروش اسپات' ||
+    str === 'ask' ||
+    str === 'short'
   ) {
     return 'SELL';
   }
 
-  // BUY indicators (Exact or strong phrase matches)
+  // Exact BUY indicators
   if (
     str === 'buy' ||
     str === 'b' ||
@@ -238,13 +293,21 @@ export function parseSideStrict(value: any): TradeSide | null {
     str === 'خرید (ورودی)' ||
     str === 'ورودی (خرید)' ||
     str === 'ورودی' ||
-    str.includes('buy') ||
-    str.includes('خرید') ||
-    str.includes('ورود') ||
-    str.includes('واریز') ||
-    str.includes('bid') ||
-    str.includes('long')
+    str === 'خرید آسان' ||
+    str === 'خرید سریع' ||
+    str === 'خرید تعهدی' ||
+    str === 'خرید اسپات' ||
+    str === 'bid' ||
+    str === 'long'
   ) {
+    return 'BUY';
+  }
+
+  // Substring checks
+  if (str.includes('فروش') || str.includes('sell') || str.includes('خروج') || str.includes('short')) {
+    return 'SELL';
+  }
+  if (str.includes('خرید') || str.includes('buy') || str.includes('ورود') || str.includes('long')) {
     return 'BUY';
   }
 
@@ -268,7 +331,7 @@ function detectSideColumnFromData(headers: string[], rows: any[]): string | unde
     let sideMatchCount = 0;
     let nonSidePenalty = 0;
     
-    const sampleSize = Math.min(rows.length, 120);
+    const sampleSize = rows.length;
     for (let i = 0; i < sampleSize; i++) {
       const cellVal = rows[i][h];
       if (cellVal === null || cellVal === undefined || cellVal === '') continue;
@@ -292,7 +355,7 @@ function detectSideColumnFromData(headers: string[], rows: any[]): string | unde
           str.includes('market') ||
           str.includes('عادی')
         ) {
-          nonSidePenalty += 5;
+          nonSidePenalty += 3;
         }
       }
     }
@@ -311,12 +374,29 @@ function detectSideColumnFromData(headers: string[], rows: any[]): string | unde
  */
 function determineRowSide(row: any, sideKey?: string): TradeSide {
   // 1. Check designated sideKey column first if present
-  if (sideKey && row[sideKey] !== undefined && row[sideKey] !== '') {
+  if (sideKey && row[sideKey] !== undefined && row[sideKey] !== null && row[sideKey] !== '') {
     const parsed = parseSideStrict(row[sideKey]);
     if (parsed) return parsed;
   }
 
-  // 2. Scan every cell in the row for explicit BUY/SELL tokens
+  // 2. Check columns whose name strongly implies side
+  for (const [colName, rawVal] of Object.entries(row)) {
+    if (rawVal === null || rawVal === undefined || rawVal === '') continue;
+    const lower = colName.toLowerCase();
+    if (
+      lower.includes('سمت') || 
+      lower.includes('معامله') || 
+      lower.includes('side') || 
+      lower.includes('direction') || 
+      lower.includes('action') ||
+      lower.includes('عملیات')
+    ) {
+      const parsed = parseSideStrict(rawVal);
+      if (parsed) return parsed;
+    }
+  }
+
+  // 3. Fallback scan across all cells for explicit BUY/SELL tokens
   for (const [, rawVal] of Object.entries(row)) {
     if (rawVal === null || rawVal === undefined || rawVal === '') continue;
     const parsed = parseSideStrict(rawVal);
@@ -350,7 +430,7 @@ function normalizeTradeFee(rawFee: number, quantity: number, price: number, tota
   if (quantity > 0 && price > 0) {
     const ratioToQty = rawFee / quantity;
     if (ratioToQty >= 0.00005 && ratioToQty <= 0.10 && ratioToTotal < 0.00005) {
-      return Number((rawFee * price).toFixed(2));
+      return Number((rawFee * price).toFixed(6));
     }
   }
 
@@ -555,27 +635,109 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
       }
     }
 
-    const symbol = normalizeTradingPair(rawSymbol, rawQuote);
-    const currency = detectCurrency(symbol);
+    // Determine row-specific columns based on quote currency
+    const rawQuoteUpper = (rawQuote || '').toUpperCase();
+    const isRowUsd = rawQuoteUpper.includes('USDT') || rawQuoteUpper.includes('USD') || rawQuoteUpper.includes('تتر') || rawQuoteUpper.includes('دلار') || rawSymbol.toUpperCase().includes('USDT');
+
+    // If row is in USDT market, prioritize headers with (تتر) / (USDT) / (USD) / (دلار)
+    let rowPriceKey = priceKey;
+    let rowTotalKey = totalKey;
+    let rowFeeKey = feeKey;
+
+    if (isRowUsd) {
+      const usdPriceHeader = rawHeaders.find(h => {
+        const lh = h.toLowerCase();
+        return (lh.includes('تتر') || lh.includes('usdt') || lh.includes('دلار') || lh.includes('usd')) &&
+               (lh.includes('قیمت') || lh.includes('نرخ') || lh.includes('price') || lh.includes('rate')) &&
+               !lh.includes('کل') && !lh.includes('مجموع') && !lh.includes('کارمزد');
+      });
+      if (usdPriceHeader) rowPriceKey = usdPriceHeader;
+
+      const usdTotalHeader = rawHeaders.find(h => {
+        const lh = h.toLowerCase();
+        return (lh.includes('تتر') || lh.includes('usdt') || lh.includes('دلار') || lh.includes('usd')) &&
+               (lh.includes('ارزش') || lh.includes('مبلغ') || lh.includes('کل') || lh.includes('total') || lh.includes('sum')) &&
+               !lh.includes('کارمزد');
+      });
+      if (usdTotalHeader) rowTotalKey = usdTotalHeader;
+
+      const usdFeeHeader = rawHeaders.find(h => {
+        const lh = h.toLowerCase();
+        return (lh.includes('تتر') || lh.includes('usdt') || lh.includes('دلار') || lh.includes('usd')) &&
+               (lh.includes('کارمزد') || lh.includes('fee') || lh.includes('کمیسیون'));
+      });
+      if (usdFeeHeader) rowFeeKey = usdFeeHeader;
+    } else {
+      // If row is TMN market, avoid USDT columns
+      const tmnPriceHeader = rawHeaders.find(h => {
+        const lh = h.toLowerCase();
+        return (lh.includes('تومان') || lh.includes('tmn') || lh.includes('irt')) &&
+               (lh.includes('قیمت') || lh.includes('نرخ') || lh.includes('price')) &&
+               !lh.includes('کل') && !lh.includes('کارمزد');
+      });
+      if (tmnPriceHeader) rowPriceKey = tmnPriceHeader;
+    }
+
+    let symbol = normalizeTradingPair(rawSymbol, rawQuote);
+    let currency = detectCurrency(symbol);
 
     // Accurately determine side (BUY vs SELL)
     const side = determineRowSide(row, sideKey);
-    const price = priceKey ? parseNumber(row[priceKey]) : 0;
-    const quantity = qtyKey ? parseNumber(row[qtyKey]) : 0;
+    let price = rowPriceKey ? parseNumber(row[rowPriceKey]) : 0;
+    let quantity = qtyKey ? parseNumber(row[qtyKey]) : 0;
+    let total = rowTotalKey ? parseNumber(row[rowTotalKey]) : 0;
     
-    let total = totalKey ? parseNumber(row[totalKey]) : 0;
-    if (total === 0 && price > 0 && quantity > 0) {
+    // Cross-validation of price, quantity, and total:
+    if (total > 0 && quantity > 0 && price > 0) {
+      const calcTotal = price * quantity;
+      // If price * quantity differs significantly from total (>20x or <0.05x due to decimal/thousand separator issues):
+      if (calcTotal > total * 20 || calcTotal < total * 0.05) {
+        price = total / quantity;
+      }
+    } else if (total === 0 && price > 0 && quantity > 0) {
       total = price * quantity;
+    } else if (price === 0 && total > 0 && quantity > 0) {
+      price = total / quantity;
+    } else if (quantity === 0 && total > 0 && price > 0) {
+      quantity = total / price;
     }
 
-    const rawFee = feeKey ? parseNumber(row[feeKey]) : 0;
+    // Sanity check: If tagged as USD/USDT, but price > 5,000 for an altcoin (e.g. 44,000 for ICP or DOGE):
+    // The price was actually exported in Tomans!
+    const baseTicker = symbol.split('/')[0].toUpperCase();
+    const isLargeCrypto = baseTicker === 'BTC' || baseTicker === 'ETH' || baseTicker === 'PAXG' || baseTicker === 'YFI';
+    if (currency === 'USD' && !isLargeCrypto && price > 5000) {
+      // Check if another column has the real USDT price
+      let foundUsdVal = 0;
+      for (const h of rawHeaders) {
+        const val = parseNumber(row[h]);
+        if (val > 0 && val < 5000 && (h.includes('تتر') || h.includes('usdt') || h.includes('دلار') || h.includes('usd') || val === price / 100000)) {
+          foundUsdVal = val;
+          break;
+        }
+      }
+      if (foundUsdVal > 0) {
+        price = foundUsdVal;
+        total = price * quantity;
+      } else {
+        // The trade was actually executed in TMN (Toman), fix pair to TMN
+        symbol = `${baseTicker}/TMN`;
+        currency = 'TMN';
+      }
+    }
+
+    const rawFee = rowFeeKey ? parseNumber(row[rowFeeKey]) : 0;
     let fee = 0;
     if (rawFee > 0) {
       fee = normalizeTradeFee(rawFee, quantity, price, total);
+      // If trade is in USD and fee is massive (e.g. Toman fee on USD trade), cap fee to standard 0.2%
+      if (currency === 'USD' && total > 0 && fee > total * 0.1) {
+        fee = Number((total * 0.002).toFixed(4));
+      }
     } else if (total > 0) {
-      fee = Number((total * 0.002).toFixed(2));
+      fee = Number((total * 0.002).toFixed(currency === 'TMN' ? 0 : 4));
     } else if (price > 0 && quantity > 0) {
-      fee = Number((price * quantity * 0.002).toFixed(2));
+      fee = Number((price * quantity * 0.002).toFixed(currency === 'TMN' ? 0 : 4));
     }
     const date = dateKey ? formatDate(row[dateKey]) : new Date().toISOString().split('T')[0];
     

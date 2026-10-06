@@ -33,6 +33,9 @@ export interface AssetAnalysis {
   sellFees: number; // Fees paid specifically on SELL orders
   totalFees: number;
   netQty: number; // Remaining position balance
+  isClosed: boolean; // True if position is fully closed (or >98.5% sold / 0 balance)
+  soldPercentage: number; // Percentage of bought volume that has been sold (0 to 100%)
+  remainingPercentage: number; // Percentage of bought volume remaining
   breakevenPrice: number; // Price required to exit remaining balance without loss (including remaining fees)
   currentPrice: number; // Entered by user or default
   realizedPnL: number; // Closed trades profit/loss

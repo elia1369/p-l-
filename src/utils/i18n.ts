@@ -349,12 +349,23 @@ export function formatCurrency(
 
   if (isToman) {
     // For Toman, integer amounts don't need decimal zeros; small numbers get up to 2 decimals
-    maxDecimals = absNum < 10 && absNum > 0 ? 2 : (Number.isInteger(absNum) ? 0 : 2);
+    maxDecimals = absNum < 100 && absNum > 0 ? 2 : (Number.isInteger(absNum) ? 0 : 2);
     minDecimals = 0;
   } else {
-    // For USD, standard 2 decimals, or 4 decimals if micro-cent
-    maxDecimals = absNum < 1 && absNum > 0 ? 4 : 2;
-    minDecimals = absNum < 1 && absNum > 0 ? 4 : 2;
+    // For USD:
+    if (absNum === 0) {
+      maxDecimals = 2;
+      minDecimals = 2;
+    } else if (absNum < 0.01 && absNum > 0) {
+      maxDecimals = 6;
+      minDecimals = 2;
+    } else if (absNum < 1 && absNum >= 0.01) {
+      maxDecimals = 4;
+      minDecimals = 2;
+    } else {
+      maxDecimals = 2;
+      minDecimals = 2;
+    }
   }
 
   // ALWAYS format using 'en-US' so numbers appear in Latin digits (0-9)

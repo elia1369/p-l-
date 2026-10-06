@@ -597,22 +597,45 @@ export function findWallexMarket(
 ): WallexMarket | undefined {
   if (!rawSymbol || !markets || markets.length === 0) return undefined;
 
-  const quote = preferredQuote?.toUpperCase() || (rawSymbol.toUpperCase().includes('USDT') ? 'USDT' : 'TMN');
+  let quote = preferredQuote?.toUpperCase();
+  if (quote === 'USD') quote = 'USDT';
+  if (quote === 'TOMAN' || quote === 'IRT' || quote === 'IRR' || quote === 'تومان') quote = 'TMN';
+
+  if (!quote) {
+    quote = (rawSymbol.toUpperCase().includes('USDT') || rawSymbol.toUpperCase().includes('USD') || rawSymbol.toUpperCase().includes('تتر') || rawSymbol.toUpperCase().includes('دلار')) 
+      ? 'USDT' 
+      : 'TMN';
+  }
+
   const compact = rawSymbol.replace(/[\/\-_ ]/g, '').toUpperCase();
-
-  const exact = markets.find(m => m.symbol.toUpperCase() === compact);
-  if (exact) return exact;
-
   const parts = rawSymbol.split(/[\/\-_ ]/);
-  const base = parts[0].trim().toUpperCase();
+  const base = parts[0].trim().toUpperCase().replace(/(TMN|USDT|USD|IRT|TOMAN)$/, '');
 
+  // 1. Exact match with symbol and matching quote asset
+  const exact = markets.find(m => m.symbol.toUpperCase() === compact);
+  if (exact && exact.quote_asset.toUpperCase() === quote) return exact;
+
+  // 2. Base asset + exact matching Quote asset
   const baseQuoteMatch = markets.find(
     m => m.base_asset.toUpperCase() === base && m.quote_asset.toUpperCase() === quote
   );
   if (baseQuoteMatch) return baseQuoteMatch;
 
-  const baseOnlyMatch = markets.find(m => m.base_asset.toUpperCase() === base);
-  if (baseOnlyMatch) return baseOnlyMatch;
+  // 3. Fallback: if preferredQuote is USDT, look for ${base}USDT
+  if (quote === 'USDT' || quote === 'USD') {
+    const usdtMatch = markets.find(
+      m => m.base_asset.toUpperCase() === base && (m.quote_asset.toUpperCase() === 'USDT' || m.symbol.toUpperCase() === `${base}USDT`)
+    );
+    if (usdtMatch) return usdtMatch;
+    // NEVER fallback to TMN market when user/asset is in USD/USDT!
+    return undefined;
+  }
+
+  // 4. If quote is TMN, look for base + TMN
+  const tmnMatch = markets.find(
+    m => m.base_asset.toUpperCase() === base && (m.quote_asset.toUpperCase() === 'TMN' || m.symbol.toUpperCase() === `${base}TMN`)
+  );
+  if (tmnMatch) return tmnMatch;
 
   return undefined;
 }

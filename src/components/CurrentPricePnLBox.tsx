@@ -5,13 +5,19 @@ import {
   TrendingDown, 
   DollarSign, 
   Scale, 
-  Sparkles,
-  ArrowRightLeft,
-  CheckCircle2,
-  Percent,
-  Coins,
-  RefreshCw,
-  Activity
+  Sparkles, 
+  ArrowRightLeft, 
+  CheckCircle2, 
+  Percent, 
+  Coins, 
+  RefreshCw, 
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Grid,
+  Filter,
+  Check
 } from 'lucide-react';
 import { AssetAnalysis, Language, CurrencyKind } from '../types';
 import { translations, formatCurrency, formatPercent, formatNumber } from '../utils/i18n';
@@ -57,12 +63,34 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
   // Active selected asset
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
 
+  // Asset drawer & grid layout states
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'CLOSED'>('ALL');
+
   // Wallex Live Markets state (from GET /hector/web/v1/markets)
   const [wallexMarkets, setWallexMarkets] = useState<WallexMarket[]>([]);
   const [isLoadingWallex, setIsLoadingWallex] = useState<boolean>(false);
   const [wallexError, setWallexError] = useState<string | null>(null);
   const [lastLivePriceFetched, setLastLivePriceFetched] = useState<number | null>(null);
   const [isManualOverride, setIsManualOverride] = useState<boolean>(false);
+
+  const openPositionsCount = useMemo(() => {
+    return assets.filter(a => !a.isClosed && a.netQty > 0.0001).length;
+  }, [assets]);
+
+  const filteredAssets = useMemo(() => {
+    return assets.filter(a => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        if (!a.symbol.toLowerCase().includes(q)) return false;
+      }
+      const hasOpen = !a.isClosed && a.netQty > 0.0001;
+      if (statusFilter === 'OPEN' && !hasOpen) return false;
+      if (statusFilter === 'CLOSED' && hasOpen) return false;
+      return true;
+    });
+  }, [assets, searchQuery, statusFilter]);
 
   // Load Wallex markets on mount
   useEffect(() => {
@@ -203,7 +231,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
   const costBasis = activeAsset?.avgBuyPrice || 0;
   const breakeven = activeAsset?.breakevenPrice || costBasis;
   const netQty = activeAsset?.netQty || 0;
-  const isPositionOpen = Math.abs(netQty) > 0.00001;
+  const isPositionOpen = !activeAsset?.isClosed && netQty > 0.0001;
 
   // For open positions: compare with current market price
   // For closed positions: output is 100% realized from actual trades (synced with AssetAnalyzer)
@@ -227,50 +255,188 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
       id="current-price-pnl-card"
       className="mt-5 rounded-2xl border border-emerald-500/25 dark:border-emerald-500/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-6 shadow-lg shadow-emerald-950/5 transition-all"
     >
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/15 text-emerald-600 dark:text-emerald-400 shadow-xs shadow-emerald-500/10">
-            <Calculator className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-sm sm:text-base font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
-              {t.calcBoxTitle}
-            </h4>
-          </div>
-        </div>
+      {/* If multiple assets in Excel, interactive Drawer & Dual-Column Grid switcher */}
+      {assets.length > 1 && (
+        <div className="pb-4 mb-2 border-b border-slate-200/80 dark:border-slate-800/80 space-y-2.5">
+          {/* Active Asset Banner & Drawer Trigger */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-mono font-black text-sm text-white shadow-xs shadow-emerald-500/20 shrink-0">
+                {activeAsset ? activeAsset.symbol.split('/')[0].slice(0, 4) : 'COIN'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-extrabold font-mono text-slate-900 dark:text-slate-100">
+                    {activeAsset?.symbol}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isPositionOpen
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}>
+                    {isPositionOpen
+                      ? (lang === 'fa' ? `موجودی باز: ${formatNumber(netQty, lang)}` : `Open: ${formatNumber(netQty, lang)}`)
+                      : (lang === 'fa' ? 'موقعیت بسته (۱۰۰٪ فروش رفت)' : 'Closed (100% Sold)')}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <span>{lang === 'fa' ? 'میانگین خرید: ' : 'Avg Buy: '}</span>
+                  <b className="font-mono text-slate-700 dark:text-slate-200">
+                    {activeAsset ? formatCurrency(activeAsset.avgBuyPrice, lang, activeAsset.currency) : '-'}
+                  </b>
+                  {activeAsset && (
+                    <span className="ms-2">
+                      • {lang === 'fa' ? `فروش‌رفته: ${formatPercent(activeAsset.soldPercentage, lang)}` : `Sold: ${formatPercent(activeAsset.soldPercentage, lang)}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
 
-        {/* If multiple assets in Excel, asset switcher */}
-        {assets.length > 1 && (
-          <div className="flex items-center gap-1.5 self-start sm:self-auto overflow-x-auto max-w-full pb-1 sm:pb-0">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-              {t.selectAsset}:
-            </span>
-            <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
-              {assets.map(a => {
-                const m = wallexMarkets.length > 0 ? findWallexMarket(wallexMarkets, a.symbol, a.currency) : undefined;
-                const label = m?.fa_base_asset && lang === 'fa' ? `${m.fa_base_asset} (${a.symbol})` : a.symbol;
-                return (
-                  <button
-                    key={a.symbol}
-                    type="button"
-                    onClick={() => setSelectedSymbol(a.symbol)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                      selectedSymbol === a.symbol
-                        ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    <CurrencyLogo currency={a.currency} lang={lang} size="xs" />
-                    <span>{label}</span>
-                    <span className={`ms-1 w-1.5 h-1.5 rounded-full ${Math.abs(a.netQty) > 0.00001 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                  </button>
-                );
-              })}
+            {/* Dropdown / Drawer Toggle Button */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setIsDrawerOpen(prev => !prev)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer shadow-2xs border ${
+                  isDrawerOpen
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
+                }`}
+              >
+                <Grid className="w-3.5 h-3.5 text-emerald-500" />
+                <span>
+                  {isDrawerOpen
+                    ? (lang === 'fa' ? 'بستن منوی نمادها' : 'Close Drawer')
+                    : (lang === 'fa' ? `انتخاب نماد (${assets.length} دارایی)` : `Switch Asset (${assets.length})`)}
+                </span>
+                {isDrawerOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Expandable Drawer: Search, Status Filters & Dual-Column Card Grid */}
+          {isDrawerOpen && (
+            <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              {/* Search & Filter Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Instant Search input */}
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={lang === 'fa' ? 'جستجوی نماد دارایی (مثلاً BTC, ICP, ETH)...' : 'Search symbol...'}
+                    className="w-full pr-9 pl-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Filter Chips */}
+                <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs shrink-0 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                      statusFilter === 'ALL'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'fa' ? `همه (${assets.length})` : `All (${assets.length})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('OPEN')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                      statusFilter === 'OPEN'
+                        ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'fa' ? `باز (${openPositionsCount})` : `Open (${openPositionsCount})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('CLOSED')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                      statusFilter === 'CLOSED'
+                        ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lang === 'fa' ? `بسته (${assets.length - openPositionsCount})` : `Closed (${assets.length - openPositionsCount})`}
+                  </button>
+                </div>
+              </div>
+
+              {/* Responsive Columnar Grid (2 columns on mobile, 3-4 on desktop) */}
+              {filteredAssets.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
+                  {filteredAssets.map(a => {
+                    const isSelected = selectedSymbol === a.symbol;
+                    const hasOpen = !a.isClosed && a.netQty > 0.0001;
+                    return (
+                      <button
+                        key={a.symbol}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSymbol(a.symbol);
+                          setIsDrawerOpen(false);
+                        }}
+                        className={`group relative flex flex-col justify-between p-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/30 ring-2 ring-emerald-500/30'
+                            : 'bg-slate-50/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-700/80 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 hover:border-emerald-500/40 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-mono font-black text-xs tracking-tight">
+                            {a.symbol}
+                          </span>
+                          {isSelected ? (
+                            <Check className="w-3.5 h-3.5 text-white" />
+                          ) : (
+                            <span 
+                              className={`w-2 h-2 rounded-full ${hasOpen ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                            />
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] w-full">
+                          <span className={isSelected ? 'text-emerald-100' : (hasOpen ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400')}>
+                            {hasOpen ? (lang === 'fa' ? `مانده: ${formatNumber(a.netQty, lang)}` : `Open: ${formatNumber(a.netQty, lang)}`) : (lang === 'fa' ? 'بسته شد' : 'Closed')}
+                          </span>
+                          <span className={`font-mono text-[9px] ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                            {formatPercent(a.soldPercentage, lang)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-xs text-slate-400">
+                  {lang === 'fa' ? 'هیچ نمادی مطابق با فیلتر یافت نشد.' : 'No matching symbol found.'}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Content Area */}
       {activeAsset ? (
@@ -296,7 +462,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                     }`}>
                       {isPositionOpen
                         ? (lang === 'fa' ? `موجودی باز: ${formatNumber(netQty, lang)}` : `Open: ${formatNumber(netQty, lang)}`)
-                        : (lang === 'fa' ? 'موقعیت بسته شده (حجم صفر)' : 'Closed Position (Zero Balance)')}
+                        : (lang === 'fa' ? 'موقعیت بسته شده (۱۰۰٪ فروش رفت)' : 'Closed (100% Sold)')}
                     </span>
                     <CurrencyLogo currency={activeAsset.currency} lang={lang} size="xs" />
                   </div>
@@ -318,6 +484,16 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                   <span>
                     {lang === 'fa' ? 'حجم کل فروش:' : 'Total Sell Volume:'}{' '}
                     <b className="font-mono text-slate-700 dark:text-slate-200">{formatNumber(activeAsset.totalSellQty, lang)}</b>
+                  </span>
+                </div>
+
+                {/* Sold percentage progress summary */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <span>
+                    {lang === 'fa' ? 'میزان فروش‌رفته:' : 'Sold Volume:'}
+                  </span>
+                  <span className={`font-mono font-bold ${activeAsset.isClosed ? 'text-slate-600 dark:text-slate-300' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {formatPercent(activeAsset.soldPercentage, lang)} {activeAsset.isClosed ? (lang === 'fa' ? '(تسویه کامل)' : '(Fully Closed)') : (lang === 'fa' ? `(مانده: ${formatNumber(activeAsset.netQty, lang)})` : `(Left: ${formatNumber(activeAsset.netQty, lang)})`)}
                   </span>
                 </div>
 

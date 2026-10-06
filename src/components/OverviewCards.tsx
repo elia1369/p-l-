@@ -39,15 +39,18 @@ const FormattedOverviewAmount: React.FC<FormattedOverviewAmountProps> = ({
   // Decimals handling:
   // For Toman, small numbers (<100) keep 2 decimals, large amounts (>=100k) don't need decimals
   let maxDec = 2;
+  let minDec = 0;
   if (isToman) {
     maxDec = absNum >= 100000 ? (Number.isInteger(absNum) ? 0 : 2) : 2;
+    minDec = 0;
   } else {
-    maxDec = absNum < 1 && absNum > 0 ? 4 : 2;
+    maxDec = absNum < 0.01 && absNum > 0 ? 6 : (absNum < 1 && absNum > 0 ? 4 : 2);
+    minDec = 2;
   }
 
   const numStr = absNum.toLocaleString('en-US', {
     maximumFractionDigits: maxDec,
-    minimumFractionDigits: 0,
+    minimumFractionDigits: minDec,
   });
 
   const fullDisplay = `${sign}${numStr}`;
@@ -116,9 +119,6 @@ export const OverviewCards: React.FC<Props> = ({ summary, lang }) => {
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {lang === 'fa' ? 'تفکیک ارزهای محاسبه‌شده:' : 'Portfolio Currency:'}
-            </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {lang === 'fa' ? '(معاملات تومانی و دلاری تفکیک شدند)' : '(Toman & USD trades isolated)'}
             </span>
           </div>
 

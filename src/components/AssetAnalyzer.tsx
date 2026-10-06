@@ -44,16 +44,13 @@ export const AssetAnalyzer: React.FC<Props> = ({
             <span>{t.assetAnalysisTitle}</span>
           </h2>
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 self-start sm:self-auto bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg">
-          {assets.length} {lang === 'fa' ? 'دارایی تحلیل‌شده' : 'Analyzed Assets'}
-        </div>
       </div>
 
       {/* Asset Cards List */}
       <div className="grid grid-cols-1 gap-4">
         {assets.map((asset) => {
           const isProfit = asset.netPnL >= 0;
-          const hasOpenPosition = Math.abs(asset.netQty) > 0.00001;
+          const hasOpenPosition = !asset.isClosed && asset.netQty > 0.0001;
           
           // Distance between current price and breakeven cost basis
           const diffFromBreakeven = asset.breakevenPrice > 0 
@@ -82,21 +79,14 @@ export const AssetAnalyzer: React.FC<Props> = ({
                           {asset.symbol}
                         </h3>
                         <CurrencyLogo symbolOrCurrency={asset.symbol} lang={lang} size="xs" />
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          isProfit 
-                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' 
-                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
-                        }`}>
-                          {isProfit ? t.profit : t.loss}
-                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
                         <span>{asset.tradesCount} {lang === 'fa' ? 'معامله' : 'trades'}</span>
                         <span>•</span>
                         <span>
                           {hasOpenPosition 
-                            ? `${t.netPosition}: ${formatNumber(asset.netQty, lang)}` 
-                            : (lang === 'fa' ? 'پوزیشن بسته شد' : 'Closed Position')}
+                            ? `${t.netPosition}: ${formatNumber(asset.netQty, lang)} (${formatPercent(asset.soldPercentage, lang)} فروش‌رفته)` 
+                            : (lang === 'fa' ? 'پوزیشن بسته شد (۱۰۰٪ فروش رفت)' : 'Closed Position (100% Sold)')}
                         </span>
                       </div>
                     </div>
@@ -243,7 +233,7 @@ export const AssetAnalyzer: React.FC<Props> = ({
                         }`}>
                           {isAboveBreakeven ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                           <span>
-                            {Math.abs(diffFromBreakeven).toFixed(2)}% {isAboveBreakeven ? t.aboveBreakeven : t.belowBreakeven}
+                            {isAboveBreakeven ? '+' : ''}{diffFromBreakeven.toFixed(2)}%
                           </span>
                         </span>
                       </div>
