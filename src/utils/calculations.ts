@@ -2,13 +2,20 @@ import { TradeRecord, AssetAnalysis, PortfolioSummary } from '../types';
 import { detectCurrency } from './i18n';
 
 /**
- * Ensures fees are realistic and not accidentally multiplied by price or corrupted
+ * Ensures fees are realistic and not accidentally multiplied by price or corrupted.
+ * If fee is 0 (or not specified in the Excel row), calculates using the standard exchange fee formula (0.2%).
  */
 export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number }): number {
-  let fee = trade.fee || 0;
   const p = Number(trade.price) || 0;
   const q = Number(trade.quantity) || 0;
   const gross = p * q;
+  let fee = (trade.fee !== undefined && trade.fee !== null && Number(trade.fee) > 0) ? Number(trade.fee) : 0;
+  
+  // If fee is 0 or absent, calculate via standard 0.2% exchange fee formula
+  if (fee <= 0 && gross > 0) {
+    fee = gross * 0.002;
+  }
+
   // If fee is greater than 10% of gross trade turnover, it was likely miscalculated or multiplied by price accidentally
   if (gross > 0 && fee > gross * 0.1) {
     if (p > 0 && (fee / p) <= gross * 0.05) {
@@ -17,7 +24,7 @@ export function getSanitizedTradeFee(trade: { price: number; quantity: number; f
       fee = gross * 0.002; // standard 0.2% fee fallback
     }
   }
-  return fee;
+  return Number(fee.toFixed(2));
 }
 
 /**

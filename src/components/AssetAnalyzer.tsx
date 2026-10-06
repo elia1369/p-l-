@@ -102,71 +102,96 @@ export const AssetAnalyzer: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Live Price Input & Quick Adjustments */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        {t.currentPrice}:
-                      </label>
-                      <div className="relative flex-1 sm:w-36">
-                        <input
-                          id={`input-current-price-${asset.symbol.replace(/[^a-zA-Z0-9]/g, '-')}`}
-                          type="number"
-                          step="any"
-                          value={asset.currentPrice || ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            onUpdatePrice(asset.symbol, isNaN(val) ? 0 : val);
-                          }}
-                          placeholder={t.currentPriceInputPlaceholder}
-                          className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono text-sm font-bold text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition text-left"
-                          dir="ltr"
-                        />
+                  {/* Live Price Input / Closed Position Status */}
+                  {hasOpenPosition ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                          {t.currentPrice}:
+                        </label>
+                        <div className="relative flex-1 sm:w-36">
+                          <input
+                            id={`input-current-price-${asset.symbol.replace(/[^a-zA-Z0-9]/g, '-')}`}
+                            type="number"
+                            step="any"
+                            value={asset.currentPrice || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              onUpdatePrice(asset.symbol, isNaN(val) ? 0 : val);
+                            }}
+                            placeholder={t.currentPriceInputPlaceholder}
+                            className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono text-sm font-bold text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition text-left"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick percentage adjustment buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 1.01)}
+                          title="+1%"
+                          className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 transition cursor-pointer"
+                        >
+                          +1%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 1.05)}
+                          title="+5%"
+                          className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 transition cursor-pointer"
+                        >
+                          +5%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 0.99)}
+                          title="-1%"
+                          className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer"
+                        >
+                          -1%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 0.95)}
+                          title="-5%"
+                          className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer"
+                        >
+                          -5%
+                        </button>
                       </div>
                     </div>
-
-                    {/* Quick percentage adjustment buttons */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 1.01)}
-                        title="+1%"
-                        className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 transition cursor-pointer"
-                      >
-                        +1%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 1.05)}
-                        title="+5%"
-                        className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 transition cursor-pointer"
-                      >
-                        +5%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 0.99)}
-                        title="-1%"
-                        className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer"
-                      >
-                        -1%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpdatePrice(asset.symbol, asset.currentPrice * 0.95)}
-                        title="-5%"
-                        className="px-1.5 py-1 rounded-md text-[10px] font-mono font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer"
-                      >
-                        -5%
-                      </button>
+                  ) : (
+                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800/80 text-xs">
+                      <div className="flex flex-col">
+                        <span className="text-slate-400 text-[10px]">{t.avgBuyPrice}</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {formatCurrency(asset.avgBuyPrice, lang, asset.symbol)}
+                        </span>
+                      </div>
+                      <span className="text-slate-300 dark:text-slate-700">|</span>
+                      <div className="flex flex-col">
+                        <span className="text-slate-400 text-[10px]">{t.avgSellPrice}</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {asset.avgSellPrice > 0 ? formatCurrency(asset.avgSellPrice, lang, asset.symbol) : '-'}
+                        </span>
+                      </div>
+                      <span className="text-slate-300 dark:text-slate-700">|</span>
+                      <div className="flex flex-col">
+                        <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">{t.totalFeesPaid}</span>
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {formatCurrency(asset.totalFees, lang, asset.symbol)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Net P&L Display */}
                   <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div className="text-right sm:text-left">
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {t.netPnL}
+                        {hasOpenPosition ? t.netPnL : (lang === 'fa' ? 'سود/زیان قطعی' : 'Realized P&L')}
                       </div>
                       <div className={`text-lg sm:text-xl font-black font-mono tracking-tight ${
                         isProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'

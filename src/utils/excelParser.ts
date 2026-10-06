@@ -88,85 +88,95 @@ function findColumnKey(headers: string[], keywords: string[], options?: ColumnMa
   return undefined;
 }
 
+// List of common cryptocurrency ticker symbols for data-driven column detection
+const KNOWN_COIN_TICKERS = new Set([
+  'TON', 'ADA', 'USDT', 'ETH', 'BTC', 'SOL', 'NEAR', 'ETC', 'XRP', 'DOGE', 'SHIB',
+  'TRX', 'BNB', 'AVAX', 'MATIC', 'LINK', 'DOT', 'ATOM', 'LTC', 'ICP', 'UNI', 'XLM',
+  'FTM', 'SAND', 'MANA', 'GALA', 'APE', 'ARB', 'OP', 'SUI', 'APT', 'PEPE', 'FLOKI',
+  'BONK', 'WIF', 'PAXG', 'NOT', 'DOGS', 'HMSTR', 'CATI', 'XMR', 'BCH', 'FIL', 'ALGO',
+  'VET', 'ICP', 'GRT', 'AAVE', 'MKR', 'RNDR', 'INJ', 'TIA', 'SEI', 'STX', 'KAS', 'FET'
+]);
+
+const KNOWN_MARKET_QUOTES = new Set([
+  'TMN', 'IRT', 'TOMAN', 'IRR', 'USDT', 'USD', 'تومان', 'تومن', 'تتر', 'دلار'
+]);
+
 /**
  * Normalizes trading pair strings such as "icp/tmn", "icp/usdt", "icp_tmn", "icptmn", "ICP تومان",
- * or separate Base ("ICP") and Market/Quote ("TMN" or "USDT") columns into standardized "ICP/TMN" or "ICP/USDT".
+ * or separate Base ("TON", "ADA", "USDT") and Market/Quote ("TMN" or "USDT") columns into standardized "TON/TMN", "ADA/TMN", etc.
  */
 export function normalizeTradingPair(rawSymbol: string, rawQuote?: string): string {
   let sym = String(rawSymbol || '').trim();
   let quote = String(rawQuote || '').trim();
 
-  if (!sym && !quote) return 'ASSET/USDT';
-  if (!sym && quote) return quote.toUpperCase();
-
-  // Strip extraneous surrounding punctuation
+  // Strip quotes and parens
   sym = sym.replace(/^["'(\[]+|["')\]]+$/g, '').trim();
+  quote = quote.replace(/^["'(\[]+|["')\]]+$/g, '').trim();
 
-  // Check if standard separated: e.g. ICP/TMN, icp/tmn, ICP/USDT, BTC/TMN, ICP-TMN, ICP_TMN, ICP TMN
-  const sepMatch = sym.match(/^([A-Za-z0-9]+)[\s/_\-]+([A-Za-z0-9]+|تومان|تومن|تتر)$/i);
-  if (sepMatch) {
-    const base = sepMatch[1].toUpperCase();
-    let q = sepMatch[2].toUpperCase();
-    if (q === 'TMN' || q === 'TOMAN' || q === 'IRT' || q === 'IRR' || q === 'تومان' || q === 'تومن') {
-      return `${base}/TMN`;
-    }
-    if (q === 'USDT' || q === 'USD' || q === 'تتر') {
-      return `${base}/USDT`;
-    }
-    return `${base}/${q}`;
-  }
+  if (!sym && !quote) return 'UNKNOWN/TMN';
+  if (!sym && quote) return `${quote.toUpperCase()}/TMN`;
 
-  // Check compact format: e.g. ICPTMN, ICPUSDT, BTCIRT, ETHUSDT
-  const compactMatch = sym.match(/^([A-Za-z0-9]{2,10})(TMN|TOMAN|IRT|USDT|USD)$/i);
-  if (compactMatch) {
-    const base = compactMatch[1].toUpperCase();
-    let q = compactMatch[2].toUpperCase();
-    if (q === 'TOMAN' || q === 'IRT') q = 'TMN';
-    return `${base}/${q}`;
-  }
-
-  // If a separate market / quote column exists (e.g. base="ICP", market="TMN" or "تومان")
+  // Standardize quote string if provided
+  let cleanQuote = '';
   if (quote) {
-    const cleanQuote = quote.toUpperCase().trim();
-    if (
-      cleanQuote.includes('TMN') ||
-      cleanQuote.includes('TOMAN') ||
-      cleanQuote.includes('IRT') ||
-      cleanQuote.includes('IRR') ||
-      cleanQuote.includes('تومان') ||
-      cleanQuote.includes('تومن')
-    ) {
-      return `${sym.toUpperCase().replace(/[^A-Za-z0-9]/g, '')}/TMN`;
-    }
-    if (cleanQuote.includes('USDT') || cleanQuote.includes('USD') || cleanQuote.includes('تتر')) {
-      return `${sym.toUpperCase().replace(/[^A-Za-z0-9]/g, '')}/USDT`;
+    const uq = quote.toUpperCase().trim();
+    if (uq === 'TMN' || uq === 'TOMAN' || uq === 'IRT' || uq === 'IRR' || uq === 'تومان' || uq === 'تومن') {
+      cleanQuote = 'TMN';
+    } else if (uq === 'USDT' || uq === 'USD' || uq === 'تتر' || uq === 'دلار') {
+      cleanQuote = 'USDT';
+    } else if (uq === 'BTC' || uq === 'ETH') {
+      cleanQuote = uq;
+    } else {
+      cleanQuote = uq.replace(/[^A-Za-z0-9]/g, '');
     }
   }
 
-  // Check if symbol contains TMN / Toman keyword anywhere
-  if (
-    sym.toUpperCase().includes('TMN') ||
-    sym.toUpperCase().includes('TOMAN') ||
-    sym.includes('تومان') ||
-    sym.includes('تومن')
-  ) {
-    const base = sym.replace(/TMN|TOMAN|IRT|IRR|تومان|تومن|[\s/_\-]+/gi, '').toUpperCase();
-    return `${base || 'ASSET'}/TMN`;
+  // 1. If sym already contains a slash or dash separator: e.g. "TON/TMN", "BTC-USDT", "ETH_IRT", "ADA / تومان"
+  const slashMatch = sym.match(/^([A-Za-z0-9]+)[\s/_\-]+([A-Za-z0-9]+|تومان|تومن|تتر)$/i);
+  if (slashMatch) {
+    const base = slashMatch[1].toUpperCase();
+    let q = slashMatch[2].toUpperCase();
+    if (q === 'TMN' || q === 'TOMAN' || q === 'IRT' || q === 'IRR' || q === 'تومان' || q === 'تومن') {
+      q = 'TMN';
+    } else if (q === 'USDT' || q === 'USD' || q === 'تتر') {
+      q = 'USDT';
+    }
+    return `${base}/${q}`;
   }
 
-  // Check if symbol contains USDT / Dollar keyword anywhere
-  if (sym.toUpperCase().includes('USDT') || sym.includes('تتر')) {
-    const base = sym.replace(/USDT|USD|تتر|[\s/_\-]+/gi, '').toUpperCase();
-    return `${base || 'ASSET'}/USDT`;
+  // 2. If sym is a compact pair: e.g. "BTCTMN", "ETHUSDT", "ADAIRT" (where length >= 6 and ends with TMN/USDT/IRT)
+  if (sym.length >= 6) {
+    const compactMatch = sym.match(/^([A-Za-z0-9]{2,8})(TMN|TOMAN|IRT|USDT|USD)$/i);
+    if (compactMatch) {
+      const base = compactMatch[1].toUpperCase();
+      let q = compactMatch[2].toUpperCase();
+      if (q === 'TOMAN' || q === 'IRT') q = 'TMN';
+      return `${base}/${q}`;
+    }
   }
 
-  // If contains a slash with generic quote
-  if (sym.includes('/')) {
-    const parts = sym.split('/').map(p => p.trim().toUpperCase());
-    return `${parts[0]}/${parts[1] || 'USDT'}`;
+  // Clean base symbol (e.g. "TON", "ADA", "USDT", "ETH", "NEAR", "ETC", "SOL")
+  const cleanBase = sym.toUpperCase().replace(/[^A-Za-z0-9]/g, '');
+
+  // 3. If separate quote column was given: combine cleanBase / cleanQuote
+  if (cleanQuote) {
+    return `${cleanBase || 'ASSET'}/${cleanQuote}`;
   }
 
-  return `${sym.toUpperCase()}/USDT`;
+  // 4. If base contains TMN / Toman at the end or embedded:
+  if (cleanBase.endsWith('TMN') && cleanBase.length > 3) {
+    return `${cleanBase.slice(0, -3)}/TMN`;
+  }
+  if (cleanBase.endsWith('USDT') && cleanBase.length > 4) {
+    return `${cleanBase.slice(0, -4)}/USDT`;
+  }
+
+  // 5. Default fallback quote if only base coin is known:
+  if (cleanBase === 'USDT') {
+    return 'USDT/TMN';
+  }
+
+  return `${cleanBase || 'ASSET'}/TMN`;
 }
 
 function parseNumber(value: any): number {
@@ -410,19 +420,56 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
     }
   });
 
-  // 3. Auto-detect crucial trade columns with anti-collision rules
-  const symbolKey = findColumnKey(
-    rawHeaders, 
-    ['جفت ارز', 'جفت_ارز', 'trading pair', 'pair', 'نام ارز', 'نام_ارز', 'نام نماد', 'مارکت', 'بازار', 'market', 'نماد', 'symbol', 'instrument', 'کد ارز', 'کوین', 'coin', 'ارز پایه', 'ارز مبدا', 'ارز'],
-    { excludeKeywords: ['ارزش', 'مبلغ', 'کارمزد', 'قیمت', 'حجم', 'تعداد', 'تاریخ', 'شناسه', 'order', 'fee', 'total', 'price', 'amount', 'date', 'حساب'] }
+  // 3. Intelligent multi-layer Column Detection
+  // Layer A: Check data rows to find which column actually contains coin symbols (TON, ADA, ETH, etc.)
+  let dataBaseCoinKey: string | undefined;
+  let dataQuoteKey: string | undefined;
+  let maxCoinTickerMatches = 0;
+  let maxQuoteMatches = 0;
+
+  const sampleSize = Math.min(rawRows.length, 60);
+  for (const h of rawHeaders) {
+    let coinMatch = 0;
+    let quoteMatch = 0;
+    for (let r = 0; r < sampleSize; r++) {
+      const val = String(rawRows[r][h] || '').trim().toUpperCase();
+      if (!val) continue;
+      if (KNOWN_COIN_TICKERS.has(val)) coinMatch++;
+      if (KNOWN_MARKET_QUOTES.has(val)) quoteMatch++;
+    }
+    if (coinMatch > maxCoinTickerMatches && coinMatch >= 2) {
+      maxCoinTickerMatches = coinMatch;
+      dataBaseCoinKey = h;
+    }
+    if (quoteMatch > maxQuoteMatches && quoteMatch >= 2 && h !== dataBaseCoinKey) {
+      maxQuoteMatches = quoteMatch;
+      dataQuoteKey = h;
+    }
+  }
+
+  // Layer B: Header-based matching for Base Coin, Quote Market, and Combined Pair
+  const headerBaseCoinKey = findColumnKey(
+    rawHeaders,
+    ['نوع کوین', 'نام کوین', 'کوین', 'نوع ارز', 'نام ارز', 'ارز پایه', 'ارز مبدا', 'ارز دیجیتال', 'رمزارز', 'دارایی', 'coin', 'base coin', 'base asset', 'base', 'crypto', 'asset', 'token'],
+    { excludeKeywords: ['پایه بازار', 'نوع معامله', 'نوع معامله2', 'قیمت کل', 'ارزش کل', 'کارمزد', 'قیمت واحد', 'قیمت', 'حجم', 'تعداد', 'تاریخ', 'شناسه'] }
   );
 
-  // Quote or market column if separate (e.g. Base: ICP, Quote/Market: TMN or USDT)
-  const quoteKey = findColumnKey(
+  const headerQuoteKey = findColumnKey(
     rawHeaders,
-    ['بازار', 'مارکت', 'market', 'ارز مقصد', 'ارز مبنا', 'ارز دوم', 'واحد', 'واحد قیمت', 'واحد معامله', 'واحد پول', 'quote', 'quote currency', 'currency'],
-    { excludeKeywords: ['ارزش', 'مبلغ', 'کارمزد', 'قیمت', 'حجم', 'تعداد', 'تاریخ', 'شناسه', 'order', symbolKey || ''] }
+    ['پایه بازار', 'بازار پایه', 'ارز بازار', 'نوع بازار', 'ارز مقصد', 'ارز مبنا', 'ارز دوم', 'واحد پایه معامله', 'واحد قیمت', 'واحد معامله', 'واحد پول', 'مارکت', 'بازار', 'quote', 'quote currency', 'market'],
+    { excludeKeywords: ['نوع کوین', 'نام کوین', 'کوین', 'نوع معامله', 'نوع معامله2', 'قیمت کل', 'ارزش کل', 'کارمزد', 'قیمت واحد', 'قیمت', 'حجم', 'تعداد', 'تاریخ', 'شناسه'] }
   );
+
+  const headerPairKey = findColumnKey(
+    rawHeaders,
+    ['جفت ارز', 'جفت_ارز', 'نماد معامله', 'نماد', 'مارکت معامله', 'trading pair', 'pair', 'symbol', 'instrument'],
+    { excludeKeywords: ['نوع کوین', 'نام کوین', 'پایه بازار', 'نوع معامله', 'نوع معامله2', 'ارزش', 'مبلغ', 'کارمزد', 'قیمت', 'حجم', 'تعداد', 'تاریخ', 'شناسه'] }
+  );
+
+  // Resolved Symbol & Quote Keys: prioritize verified data coin column, then base coin + quote, then pair
+  const baseCoinKey = dataBaseCoinKey || headerBaseCoinKey;
+  const quoteKey = (dataQuoteKey && dataQuoteKey !== baseCoinKey) ? dataQuoteKey : (headerQuoteKey !== baseCoinKey ? headerQuoteKey : undefined);
+  const pairKey = headerPairKey && headerPairKey !== baseCoinKey && headerPairKey !== quoteKey ? headerPairKey : undefined;
 
   // 4. Data-driven Side Detection (inspects actual cell values: BUY vs SELL vs اسپات)
   const dataSideKey = detectSideColumnFromData(rawHeaders, rawRows);
@@ -431,14 +478,15 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
   const headerSideKey = findColumnKey(
     rawHeaders, 
     [
+      'نوع معامله', 'سمت معامله', 'سمت سفارش', 'سمت', 'جهت معامله', 'جهت', 'طرف معامله', 
       'خرید/فروش', 'خرید / فروش', 'خرید/ فروش', 'خرید یا فروش', 'خرید و فروش',
-      'سمت', 'سمت معامله', 'سمت سفارش', 'جهت', 'جهت معامله', 'طرف معامله', 
       'side', 'trade side', 'order side', 'trade_side', 'order_side',
-      'عملیات', 'دستور', 'نوع معامله', 'نوع سفارش', 'نوع', 'type', 'action', 'direction'
+      'عملیات', 'دستور', 'نوع سفارش', 'نوع', 'type', 'action', 'direction'
     ],
     { 
       excludeKeywords: [
-        'اسپات', 'spot', 'مارجین', 'margin', 'تعهدی', 'فیوچرز', 'futures', 
+        'نوع معامله2', 'نوع معامله 2', 'نوع معامله_2', 'نوع کوین', 'پایه بازار',
+        'اسپات', 'spot', 'مارجین', 'margin', 'تعهدی', 'فیوچرز', 'futures', 'سکو',
         'نوع بازار', 'حساب', 'account', 'وضعیت', 'status', 'شناسه', 'id', 
         'تاریخ', 'date', 'قیمت', 'price', 'مبلغ', 'ارزش', 'total', 
         'کارمزد', 'fee', 'مقدار', 'حجم', 'تعداد', 'qty', 'amount', 'واحد', 'ارز', 'symbol'
@@ -450,26 +498,26 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
 
   const priceKey = findColumnKey(
     rawHeaders, 
-    ['قیمت واحد', 'قیمت معامله', 'نرخ', 'fill price', 'exec price', 'unit price', 'rate', 'price', 'قیمت'],
-    { excludeKeywords: ['ارزش کل', 'مجموع', 'کارمزد کل', 'کارمزد'] }
+    ['قیمت واحد', 'قیمت معامله', 'نرخ معامله', 'نرخ', 'قیمت واحد پایه معامله', 'fill price', 'exec price', 'unit price', 'rate', 'price', 'قیمت'],
+    { excludeKeywords: ['قیمت کل', 'ارزش کل', 'مجموع', 'کارمزد کل', 'کارمزد'] }
   );
 
   const qtyKey = findColumnKey(
     rawHeaders, 
-    ['مقدار', 'تعداد', 'حجم', 'amount', 'quantity', 'qty', 'size', 'filled', 'vol', 'volume'],
+    ['مقدار', 'تعداد', 'حجم', 'حجم معامله', 'مقدار معامله', 'amount', 'quantity', 'qty', 'size', 'filled', 'vol', 'volume'],
     { excludeKeywords: ['ارزش', 'مبلغ', 'قیمت', 'کارمزد'] }
   );
 
   const feeKey = findColumnKey(
     rawHeaders, 
-    ['کارمزد کل', 'کارمزد معامله', 'کارمزد', 'کمیسیون', 'هزینه', 'fee', 'trade fee', 'commission', 'fees'],
+    ['کارمزد کل', 'کارمزد معامله', 'کارمزد', 'کمیسیون', 'هزینه معامله', 'هزینه', 'مبلغ کارمزد', 'کارمزد (تومان)', 'کارمزد (تتر)', 'fee', 'trade fee', 'commission', 'fees', 'fee (tmn)', 'fee (usdt)', 'fee_amount', 'trading_fee'],
     { excludeKeywords: ['قیمت', 'ارزش کل', 'حجم'] }
   );
 
   const totalKey = findColumnKey(
     rawHeaders, 
-    ['ارزش کل', 'ارزش معامله', 'مبلغ کل', 'ارزش', 'مجموع', 'مبلغ', 'total', 'quote amount', 'value', 'subtotal'],
-    { excludeKeywords: ['قیمت واحد', 'قیمت', 'کارمزد'] }
+    ['قیمت کل', 'ارزش کل', 'ارزش معامله', 'مبلغ کل', 'ارزش', 'مجموع', 'مبلغ', 'total', 'quote amount', 'value', 'subtotal'],
+    { excludeKeywords: ['قیمت واحد', 'قیمت واحد پایه معامله', 'کارمزد'] }
   );
 
   const dateKey = findColumnKey(
@@ -486,8 +534,27 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
 
   rawRows.forEach((row, idx) => {
     // Extract symbol & market accurately
-    const rawSymbol = symbolKey ? row[symbolKey] : '';
-    const rawQuote = quoteKey && quoteKey !== symbolKey ? row[quoteKey] : '';
+    let rawSymbol = '';
+    let rawQuote = '';
+
+    if (baseCoinKey && row[baseCoinKey]) {
+      rawSymbol = String(row[baseCoinKey]).trim();
+      rawQuote = quoteKey && row[quoteKey] ? String(row[quoteKey]).trim() : '';
+    } else if (pairKey && row[pairKey]) {
+      rawSymbol = String(row[pairKey]).trim();
+      rawQuote = quoteKey && row[quoteKey] ? String(row[quoteKey]).trim() : '';
+    } else {
+      // Fallback to first non-empty string column that looks like a ticker
+      for (const h of rawHeaders) {
+        if (h === sideKey || h === dateKey || h === orderIdKey) continue;
+        const val = String(row[h] || '').trim();
+        if (val && (KNOWN_COIN_TICKERS.has(val.toUpperCase()) || /^[A-Z0-9]{2,10}(\/[A-Z0-9]+)?$/i.test(val))) {
+          rawSymbol = val;
+          break;
+        }
+      }
+    }
+
     const symbol = normalizeTradingPair(rawSymbol, rawQuote);
     const currency = detectCurrency(symbol);
 
@@ -502,7 +569,14 @@ export async function parseExcelFile(file: File): Promise<ParsedExcelResult> {
     }
 
     const rawFee = feeKey ? parseNumber(row[feeKey]) : 0;
-    const fee = normalizeTradeFee(rawFee, quantity, price, total);
+    let fee = 0;
+    if (rawFee > 0) {
+      fee = normalizeTradeFee(rawFee, quantity, price, total);
+    } else if (total > 0) {
+      fee = Number((total * 0.002).toFixed(2));
+    } else if (price > 0 && quantity > 0) {
+      fee = Number((price * quantity * 0.002).toFixed(2));
+    }
     const date = dateKey ? formatDate(row[dateKey]) : new Date().toISOString().split('T')[0];
     
     // Mask / clean orderId if present to avoid leaking account identifiers

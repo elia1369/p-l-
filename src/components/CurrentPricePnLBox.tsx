@@ -203,18 +203,24 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
   const costBasis = activeAsset?.avgBuyPrice || 0;
   const breakeven = activeAsset?.breakevenPrice || costBasis;
   const netQty = activeAsset?.netQty || 0;
+  const isPositionOpen = Math.abs(netQty) > 0.00001;
 
+  // For open positions: compare with current market price
+  // For closed positions: output is 100% realized from actual trades (synced with AssetAnalyzer)
   const unitDifference = parsedPrice > 0 && costBasis > 0 ? parsedPrice - costBasis : 0;
-  const percentChange = costBasis > 0 && parsedPrice > 0 ? ((parsedPrice - costBasis) / costBasis) * 100 : 0;
+  const percentChange = isPositionOpen
+    ? (costBasis > 0 && parsedPrice > 0 ? ((parsedPrice - costBasis) / costBasis) * 100 : 0)
+    : (activeAsset?.roiPercent || 0);
   
-  // Position-wide P&L based on remaining held balance (or total buy quantity if fully closed)
-  const isPositionOpen = netQty > 0.00001;
-  const effectiveQty = isPositionOpen ? netQty : (activeAsset?.totalBuyQty || 1);
-  const totalPositionPnL = parsedPrice > 0 ? (parsedPrice - breakeven) * effectiveQty : 0;
-  const holdingMarketValue = parsedPrice > 0 ? parsedPrice * netQty : 0;
+  // Realized vs Unrealized
+  const realizedPnL = activeAsset?.realizedPnL || 0;
+  const unrealizedPnL = isPositionOpen && parsedPrice > 0 ? (parsedPrice - breakeven) * netQty : 0;
+  const totalNetPnL = isPositionOpen ? realizedPnL + unrealizedPnL : (activeAsset?.netPnL || realizedPnL);
+  const holdingMarketValue = isPositionOpen && parsedPrice > 0 ? parsedPrice * netQty : 0;
+  const totalFeesPaid = activeAsset?.totalFees || 0;
 
-  const isProfit = unitDifference > 0.0001;
-  const isLoss = unitDifference < -0.0001;
+  const isProfit = isPositionOpen ? (totalNetPnL > 0.0001) : (totalNetPnL >= 0);
+  const isLoss = isPositionOpen ? (totalNetPnL < -0.0001) : (totalNetPnL < 0);
 
   return (
     <div 
@@ -257,6 +263,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                   >
                     <CurrencyLogo currency={a.currency} lang={lang} size="xs" />
                     <span>{label}</span>
+                    <span className={`ms-1 w-1.5 h-1.5 rounded-full ${Math.abs(a.netQty) > 0.00001 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                   </button>
                 );
               })}
@@ -270,7 +277,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
         <div className="mt-4 space-y-4">
           {/* Row: Cost Basis (From Excel) + Current Price Input (User) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 1. Cost Basis Card (Auto-Calculated from Excel) */}
+            {/* 1. Cost Basis & Trade Summary Card (Auto-Calculated from Excel) */}
             <div 
               id="box-cost-basis-excel"
               className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between"
@@ -281,7 +288,18 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                     <Coins className="w-4 h-4 text-amber-500" />
                     <span>{t.costBasisLabel}</span>
                   </div>
-                  <CurrencyLogo currency={activeAsset.currency} lang={lang} size="xs" />
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      isPositionOpen
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {isPositionOpen
+                        ? (lang === 'fa' ? `موجودی باز: ${formatNumber(netQty, lang)}` : `Open: ${formatNumber(netQty, lang)}`)
+                        : (lang === 'fa' ? 'موقعیت بسته شده (حجم صفر)' : 'Closed Position (Zero Balance)')}
+                    </span>
+                    <CurrencyLogo currency={activeAsset.currency} lang={lang} size="xs" />
+                  </div>
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-900 dark:text-slate-100">
@@ -290,19 +308,33 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {lang === 'fa' ? 'حجم کل خرید در اکسل:' : 'Total Buy Volume:'}{' '}
-                  <b className="font-mono text-slate-700 dark:text-slate-200">{formatNumber(activeAsset.totalBuyQty, lang)}</b>
-                </span>
-                <span>
-                  {lang === 'fa' ? 'نقطه سر‌به‌سر (با کارمزد):' : 'Breakeven (w/ Fees):'}{' '}
-                  <b className="font-mono text-slate-700 dark:text-slate-200">{formatCurrency(activeAsset.breakevenPrice, lang, activeAsset.currency)}</b>
-                </span>
+              {/* Trade Details & Fees in Cost Basis Card */}
+              <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    {lang === 'fa' ? 'حجم کل خرید:' : 'Total Buy Volume:'}{' '}
+                    <b className="font-mono text-slate-700 dark:text-slate-200">{formatNumber(activeAsset.totalBuyQty, lang)}</b>
+                  </span>
+                  <span>
+                    {lang === 'fa' ? 'حجم کل فروش:' : 'Total Sell Volume:'}{' '}
+                    <b className="font-mono text-slate-700 dark:text-slate-200">{formatNumber(activeAsset.totalSellQty, lang)}</b>
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
+                    <span>{t.totalFeesPaid}:</span>
+                    <b className="font-mono">{formatCurrency(totalFeesPaid, lang, activeAsset.currency)}</b>
+                  </span>
+                  <span>
+                    {lang === 'fa' ? 'نقطه سر‌به‌سر:' : 'Breakeven:'}{' '}
+                    <b className="font-mono text-slate-700 dark:text-slate-200">{formatCurrency(activeAsset.breakevenPrice, lang, activeAsset.currency)}</b>
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* 2. User Input Field: "قیمت فعلی ارز" (Requested explicitly) */}
+            {/* 2. User Input Field: "قیمت فعلی ارز" */}
             <div 
               id="box-current-price-user-input"
               className="p-4 rounded-xl bg-white dark:bg-slate-800/90 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-xs flex flex-col justify-between transition-all"
@@ -450,10 +482,10 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Automatic P&L Comparison Outcome Card */}
+          {/* Automatic P&L Comparison Outcome Card (Synced with AssetAnalyzer) */}
           <div 
             id="automatic-pnl-result-deck"
-            className={`rounded-xl p-4 border transition-all ${
+            className={`rounded-xl p-4 sm:p-5 border transition-all ${
               isProfit
                 ? 'bg-emerald-500/10 dark:bg-emerald-950/30 border-emerald-500/30'
                 : isLoss
@@ -468,9 +500,16 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                 }`}>
                   {isProfit ? <TrendingUp className="w-4 h-4" /> : isLoss ? <TrendingDown className="w-4 h-4" /> : <Scale className="w-4 h-4" />}
                 </div>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                  {t.calculatedPnL} ({activeAsset.symbol})
-                </span>
+                <div>
+                  <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                    {t.calculatedPnL} ({activeAsset.symbol})
+                  </span>
+                  <span className="ms-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {isPositionOpen 
+                      ? (lang === 'fa' ? '• موقعیت باز با نرخ لحظه‌ای' : '• Open Position vs Live Price') 
+                      : (lang === 'fa' ? '• موقعیت بسته شده (تحقق‌یافته قطعی)' : '• Closed Position (Realized P&L)')}
+                  </span>
+                </div>
               </div>
 
               {/* Profit / Loss status pill */}
@@ -491,38 +530,53 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
-              {/* 1. Unit Difference */}
-              <div className="space-y-0.5">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  {t.unitProfitLoss}:
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+              {/* 1. Net P&L (Synced with AssetAnalyzer) */}
+              <div className="space-y-0.5 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  {isPositionOpen ? (lang === 'fa' ? 'سود/زیان خالص کل:' : 'Total Net P&L:') : (lang === 'fa' ? 'سود/زیان قطعی محقق‌شده:' : 'Realized Net P&L:')}
                 </span>
-                <div className={`font-mono text-sm sm:text-base font-black ${
-                  isProfit ? 'text-emerald-600 dark:text-emerald-400' : isLoss ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'
+                <div className={`font-mono text-base font-black ${
+                  totalNetPnL > 0 ? 'text-emerald-600 dark:text-emerald-400' : totalNetPnL < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'
                 }`}>
-                  {unitDifference > 0 ? '+' : ''}{formatCurrency(unitDifference, lang, activeAsset.currency)}
+                  {totalNetPnL > 0 ? '+' : ''}{formatCurrency(totalNetPnL, lang, activeAsset.currency)}
                 </div>
               </div>
 
-              {/* 2. Total Position P&L */}
-              <div className="space-y-0.5">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  {t.positionPnL} ({isPositionOpen ? (lang === 'fa' ? 'موجودی باز' : 'Open Balance') : (lang === 'fa' ? 'کل خرید' : 'Total Buy')}):
+              {/* 2. Position Holding / Status */}
+              <div className="space-y-0.5 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  {isPositionOpen ? (lang === 'fa' ? 'ارزش روز موجودی باز:' : 'Current Holding Value:') : (lang === 'fa' ? 'وضعیت پوزیشن:' : 'Position Status:')}
                 </span>
-                <div className={`font-mono text-sm sm:text-base font-black ${
-                  totalPositionPnL > 0 ? 'text-emerald-600 dark:text-emerald-400' : totalPositionPnL < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'
-                }`}>
-                  {totalPositionPnL > 0 ? '+' : ''}{formatCurrency(totalPositionPnL, lang, activeAsset.currency)}
+                <div className="font-mono text-base font-black text-slate-900 dark:text-slate-100">
+                  {isPositionOpen 
+                    ? formatCurrency(holdingMarketValue, lang, activeAsset.currency)
+                    : (lang === 'fa' ? '۱۰۰٪ فروخته‌شده' : '100% Closed')}
                 </div>
               </div>
 
-              {/* 3. Current Holding Market Value */}
-              <div className="space-y-0.5">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  {t.currentHoldingValue} ({formatNumber(netQty, lang)} {lang === 'fa' ? 'واحد' : 'Units'}):
+              {/* 3. Total Fees Paid for this asset */}
+              <div className="space-y-0.5 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 block">
+                  {t.totalFeesPaid}:
                 </span>
-                <div className="font-mono text-sm sm:text-base font-black text-slate-900 dark:text-slate-100">
-                  {formatCurrency(holdingMarketValue, lang, activeAsset.currency)}
+                <div className="font-mono text-base font-black text-amber-600 dark:text-amber-400">
+                  {formatCurrency(totalFeesPaid, lang, activeAsset.currency)}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {lang === 'fa' ? `خرید: ${formatCurrency(activeAsset.buyFees || 0, lang, activeAsset.currency)} | فروش: ${formatCurrency(activeAsset.sellFees || 0, lang, activeAsset.currency)}` : `Buy: ${formatCurrency(activeAsset.buyFees || 0, lang, activeAsset.currency)}`}
+                </div>
+              </div>
+
+              {/* 4. Breakeven or Realized Price Basis */}
+              <div className="space-y-0.5 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  {isPositionOpen ? (lang === 'fa' ? 'نقطه سر‌به‌سر با کارمزد:' : 'Breakeven Price:') : (lang === 'fa' ? 'میانگین فروش ثبت‌شده:' : 'Average Sell Price:')}
+                </span>
+                <div className="font-mono text-base font-black text-slate-900 dark:text-slate-100">
+                  {isPositionOpen 
+                    ? formatCurrency(breakeven, lang, activeAsset.currency)
+                    : (activeAsset.avgSellPrice > 0 ? formatCurrency(activeAsset.avgSellPrice, lang, activeAsset.currency) : '-')}
                 </div>
               </div>
             </div>
