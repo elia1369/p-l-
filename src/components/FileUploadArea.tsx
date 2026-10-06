@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Key, 
-  FileSpreadsheet, 
-  Camera,
-  ClipboardPaste,
-  Sparkles
+  FileSpreadsheet
 } from 'lucide-react';
 import { Language, AssetAnalysis, TradeRecord, CurrencyKind, PIIReport } from '../types';
 import { translations } from '../utils/i18n';
 import { downloadExcelTemplate } from '../utils/excelParser';
 import { CurrentPricePnLBox } from './CurrentPricePnLBox';
-import { ImageTradeExtractorCard } from './ImageTradeExtractorCard';
-import { ManualBatchInputCard } from './ManualBatchInputCard';
 import { FileUploader } from './ui/file-uploader';
 import { ExchangeApiInputHub } from './ExchangeApiInputHub';
 
@@ -48,9 +43,8 @@ export const FileUploadArea: React.FC<Props> = ({
   const t = translations[lang];
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Default and Primary tab is now API Connection
-  const [activeTab, setActiveTab] = useState<'API' | 'EXCEL' | 'IMAGE_OCR'>('API');
-  const [showManualTextFallback, setShowManualTextFallback] = useState(false);
+  // Tabs: Primary is API Connection, secondary is Excel File Upload
+  const [activeTab, setActiveTab] = useState<'API' | 'EXCEL'>('API');
 
   const handleFileProcess = (file: File) => {
     setErrorMessage(null);
@@ -92,7 +86,7 @@ export const FileUploadArea: React.FC<Props> = ({
             </span>
           </button>
 
-          {/* Backup Option 1: Excel File */}
+          {/* Backup Option: Excel File */}
           <button
             id="tab-excel-upload"
             type="button"
@@ -105,21 +99,6 @@ export const FileUploadArea: React.FC<Props> = ({
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>{isRtl ? 'فایل اکسل' : 'Excel File'}</span>
-          </button>
-
-          {/* Backup Option 2: Image OCR */}
-          <button
-            id="tab-image-ocr"
-            type="button"
-            onClick={() => setActiveTab('IMAGE_OCR')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeTab === 'IMAGE_OCR'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/25'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            <span>{isRtl ? 'تصویر و ثبت دستی' : 'Image & Manual'}</span>
           </button>
         </div>
       </div>
@@ -154,7 +133,7 @@ export const FileUploadArea: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Tab 2: Excel Dropzone Fallback */}
+      {/* Tab 2: Excel Dropzone */}
       {activeTab === 'EXCEL' && (
         <div className="space-y-4">
           <FileUploader
@@ -181,52 +160,6 @@ export const FileUploadArea: React.FC<Props> = ({
             onLoadDemo={onLoadDemo}
             isExcelLoaded={Boolean(fileName || (assets && assets.length > 0))}
           />
-        </div>
-      )}
-
-      {/* Tab 3: AI Image OCR & Manual Trade Input Fallback */}
-      {activeTab === 'IMAGE_OCR' && (
-        <div className="space-y-4">
-          <ImageTradeExtractorCard
-            lang={lang}
-            onApplyManualData={(trades, symbol, curr) => {
-              if (onApplyManualData) {
-                onApplyManualData(trades, symbol, curr);
-              }
-            }}
-            customPrices={customPrices}
-            onUpdatePrice={onUpdatePrice}
-          />
-
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => setShowManualTextFallback(prev => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 underline cursor-pointer"
-            >
-              <ClipboardPaste className="w-3.5 h-3.5" />
-              <span>
-                {showManualTextFallback
-                  ? (lang === 'fa' ? 'بستن فرم ورود دستی متنی' : 'Hide manual text input')
-                  : (lang === 'fa' ? 'نیاز به ورود دستی یا پیست متنی اعداد دارید؟ کلیک کنید' : 'Need manual numeric text paste? Click here')}
-              </span>
-            </button>
-          </div>
-
-          {showManualTextFallback && (
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-              <ManualBatchInputCard
-                lang={lang}
-                onApplyManualData={(trades, symbol, curr) => {
-                  if (onApplyManualData) {
-                    onApplyManualData(trades, symbol, curr);
-                  }
-                }}
-                customPrices={customPrices}
-                onUpdatePrice={onUpdatePrice}
-              />
-            </div>
-          )}
         </div>
       )}
     </div>

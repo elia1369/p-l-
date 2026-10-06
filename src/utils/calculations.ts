@@ -5,18 +5,23 @@ import { detectCurrency } from './i18n';
  * Ensures fees are realistic and not accidentally multiplied by price or corrupted.
  * If fee is 0 (or not specified in the Excel row), calculates using the standard exchange fee formula (0.2%).
  */
-export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number; currency?: string; symbol?: string }): number {
+export function getSanitizedTradeFee(trade: { price: number; quantity: number; fee?: number; currency?: string; symbol?: string; feeAsset?: string }): number {
   const p = Number(trade.price) || 0;
   const q = Number(trade.quantity) || 0;
   const gross = p * q;
   let fee = (trade.fee !== undefined && trade.fee !== null && Number(trade.fee) > 0) ? Number(trade.fee) : 0;
   
+  // If fee was in base coin (e.g. 0.0001 BTC or 0.5 TON) where fee/q <= 0.05 and fee/gross < 0.0001:
+  if (fee > 0 && q > 0 && p > 0 && (fee / q) <= 0.05 && (gross > 0 && (fee / gross) < 0.0001)) {
+    fee = fee * p;
+  }
+
   // If fee is 0 or absent, calculate via standard 0.2% exchange fee formula
   if (fee <= 0 && gross > 0) {
     fee = gross * 0.002;
   }
 
-  // If fee is greater than 10% of gross trade turnover, it was likely miscalculated or multiplied by price accidentally
+  // If fee is greater than 10% of gross trade turnover, it was likely in a different currency or multiplied by price
   if (gross > 0 && fee > gross * 0.1) {
     if (p > 0 && (fee / p) <= gross * 0.05) {
       fee = fee / p;
@@ -26,7 +31,7 @@ export function getSanitizedTradeFee(trade: { price: number; quantity: number; f
   }
 
   const isToman = detectCurrency(trade.symbol || trade.currency) === 'TMN';
-  return isToman ? Number(fee.toFixed(0)) : Number(fee.toFixed(6));
+  return isToman ? Number(fee.toFixed(0)) : Number(fee.toFixed(4));
 }
 
 /**

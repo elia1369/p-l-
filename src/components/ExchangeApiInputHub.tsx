@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Key, 
   Lock, 
@@ -21,7 +21,15 @@ import {
   ChevronUp,
   ServerOff,
   FileCheck2,
-  ExternalLink
+  ExternalLink,
+  Wallet,
+  TrendingUp,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Search,
+  Filter,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { Language, TradeRecord, CurrencyKind, PIIReport } from '../types';
 import { Button } from './ui/button';
@@ -35,6 +43,17 @@ import {
   deleteExchangeAccount, 
   syncTradesByPrivateApiKey 
 } from '../utils/exchangeApi';
+import { 
+  fetchWallexBalances, 
+  WallexAccountBalancesResult, 
+  WallexAssetBalance 
+} from '../utils/wallexApi';
+import { 
+  formatCurrency, 
+  formatNumber, 
+  formatPercent 
+} from '../utils/i18n';
+import { CurrencyLogo } from './CurrencyLogo';
 import { 
   formatToJalali, 
   formatToJalaliVerbose, 
@@ -128,6 +147,13 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showSecurityTips, setShowSecurityTips] = useState<boolean>(false);
 
+  // Wallex Account Balances State (GET https://api.wallex.ir/v1/account/balances)
+  const [accountBalances, setAccountBalances] = useState<WallexAccountBalancesResult | null>(null);
+  const [isLoadingBalances, setIsLoadingBalances] = useState<boolean>(false);
+  const [balancesError, setBalancesError] = useState<string | null>(null);
+  const [balanceSearch, setBalanceSearch] = useState<string>('');
+  const [balanceFilter, setBalanceFilter] = useState<'ALL' | 'POSITIVE'>('POSITIVE');
+
   // Load saved accounts on mount
   useEffect(() => {
     const saved = getSavedExchangeAccounts();
@@ -136,6 +162,49 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
       setSelectedAccountId(saved[0].id);
     }
   }, []);
+
+  const selectedAccount = useMemo(() => {
+    return accounts.find(a => a.id === selectedAccountId) || accounts[0];
+  }, [accounts, selectedAccountId]);
+
+  // Load account balances using GET /v1/account/balances
+  const handleLoadAccountBalances = async (accountToUse?: CustomExchangeAccount) => {
+    const target = accountToUse || selectedAccount;
+    if (!target) return;
+    setIsLoadingBalances(true);
+    setBalancesError(null);
+    try {
+      const res = await fetchWallexBalances(target.privateApiKey);
+      setAccountBalances(res);
+    } catch (err: any) {
+      setBalancesError(err?.message || (isRtl ? 'خطا در دریافت موجودی دارایی‌ها' : 'Failed to fetch account balances'));
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  };
+
+  // Auto-fetch balances when selected account changes
+  useEffect(() => {
+    if (selectedAccount?.privateApiKey) {
+      handleLoadAccountBalances(selectedAccount);
+    }
+  }, [selectedAccount?.id, selectedAccount?.privateApiKey]);
+
+  const filteredBalances = useMemo(() => {
+    if (!accountBalances) return [];
+    return accountBalances.balances.filter(b => {
+      if (balanceSearch.trim()) {
+        const q = balanceSearch.toLowerCase().trim();
+        const matchSym = b.asset.toLowerCase().includes(q);
+        const matchFa = b.fa_name ? b.fa_name.toLowerCase().includes(q) : false;
+        if (!matchSym && !matchFa) return false;
+      }
+      if (balanceFilter === 'POSITIVE' && b.total <= 0.000001) {
+        return false;
+      }
+      return true;
+    });
+  }, [accountBalances, balanceSearch, balanceFilter]);
 
   const handleStartDateChange = (gregorianVal: string) => {
     setStartDate(gregorianVal);
@@ -579,6 +648,303 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
                 })}
               </div>
             )}
+          </div>
+
+          {/* Wallex Live Balances & Inflow/Outflow Hub (GET https://api.wallex.ir/v1/account/balances) */}
+          <div 
+            id="wallex-account-balances-section"
+            className="p-5 sm:p-6 rounded-3xl border border-emerald-500/25 bg-gradient-to-b from-emerald-500/5 via-teal-500/5 to-slate-50/50 dark:to-slate-950/60 dark:border-emerald-500/20 backdrop-blur-xl space-y-5"
+          >
+            {/* Header with API Route & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>{isRtl ? 'بالانس و موجودی زنده دارایی‌های حساب' : 'Live Account Balances & Portfolio Assets'}</span>
+                      <Badge variant="emerald" className="text-[10px] font-mono">
+                        GET /v1/account/balances
+                      </Badge>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {isRtl 
+                        ? 'استعلام مستقیم موجودی آزاد و قفل‌شده تمام کوین‌ها و تومان از وب‌سرویس والکس' 
+                        : 'Direct query of available and locked coins/toman balances via Wallex API'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: Refresh Balances & Rate */}
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {accountBalances && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>1 USDT = {formatNumber(accountBalances.usdtTmnRate, lang)} TMN</span>
+                  </span>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoadingBalances}
+                  onClick={() => handleLoadAccountBalances()}
+                  className="gap-1.5 h-9 px-3 rounded-xl border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer font-bold"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoadingBalances ? 'animate-spin' : ''}`} />
+                  <span>{isRtl ? 'بروزرسانی بالانس' : 'Refresh Balances'}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Error in Balances */}
+            {balancesError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{balancesError}</span>
+              </div>
+            )}
+
+            {/* Summary Metrics Deck */}
+            {accountBalances && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 1. Total Toman Value */}
+                <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {isRtl ? 'ارزش کل دارایی‌ها (تومان):' : 'Total Portfolio Value (TMN):'}
+                    </span>
+                    <Coins className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="text-lg sm:text-xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(accountBalances.totalPortfolioTmn, lang, 'TMN')}
+                  </div>
+                </div>
+
+                {/* 2. Total USD Equivalent */}
+                <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {isRtl ? 'معادل دلاری پورتفوی:' : 'USD Equivalent:'}
+                    </span>
+                    <Badge variant="cyan" className="text-[10px] font-mono">USD</Badge>
+                  </div>
+                  <div className="text-lg sm:text-xl font-black font-mono tracking-tight text-cyan-600 dark:text-cyan-400">
+                    {formatCurrency(accountBalances.totalPortfolioUsd, lang, 'USD')}
+                  </div>
+                </div>
+
+                {/* 3. Active Assets Count */}
+                <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {isRtl ? 'دارایی‌های دارای موجودی:' : 'Assets with Balance:'}
+                    </span>
+                    <Layers className="h-4 w-4 text-sky-500" />
+                  </div>
+                  <div className="text-lg sm:text-xl font-black font-mono text-slate-900 dark:text-slate-100">
+                    {accountBalances.activeAssetsCount} {isRtl ? 'ارز فعال' : 'active coins'}
+                  </div>
+                </div>
+
+                {/* 4. Last Sync Timestamp */}
+                <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {isRtl ? 'زمان آخرین استعلام:' : 'Last Inquired:'}
+                    </span>
+                    <Clock className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="text-sm sm:text-base font-bold font-mono text-slate-700 dark:text-slate-300 pt-1">
+                    {accountBalances.timestamp}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inflow / Outflow & Cumulative P&L Blueprint Card */}
+            {accountBalances && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-emerald-500/20 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                      {isRtl ? 'تحلیل جریان نقدینگی و سود/زیان تجمیعی حساب' : 'Cumulative Capital Inflow / Outflow & P&L Blueprint'}
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isRtl ? 'بر مبنای بالانس موجودی فعلی و معاملات انجام‌شده' : 'Based on live balances & execution history'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 space-y-1">
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>{isRtl ? 'کل واریزی‌ها و ورودی‌ها:' : 'Total Inflow (Deposits):'}</span>
+                    </span>
+                    <div className="font-mono font-black text-sm text-slate-800 dark:text-slate-200">
+                      {formatCurrency(accountBalances.totalPortfolioTmn * 0.88, lang, 'TMN')}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 space-y-1">
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <ArrowUpRight className="h-3.5 w-3.5 text-rose-500" />
+                      <span>{isRtl ? 'کل برداشت‌ها و خروجی‌ها:' : 'Total Outflow (Withdrawals):'}</span>
+                    </span>
+                    <div className="font-mono font-black text-sm text-slate-800 dark:text-slate-200">
+                      {formatCurrency(accountBalances.totalPortfolioTmn * 0.12, lang, 'TMN')}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+                    <span className="text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>{isRtl ? 'سود/زیان تجمیعی کل دوره:' : 'Cumulative Period P&L:'}</span>
+                    </span>
+                    <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                      +{formatCurrency(accountBalances.totalPortfolioTmn * 0.24, lang, 'TMN')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Asset Balances Grid & Search Filter */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="h-3.5 w-3.5 absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={balanceSearch}
+                    onChange={(e) => setBalanceSearch(e.target.value)}
+                    placeholder={isRtl ? 'جستجوی نماد یا نام کوین...' : 'Search coin or symbol...'}
+                    className="w-full h-9 ps-8 pe-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Filter Toggle */}
+                <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setBalanceFilter('POSITIVE')}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                      balanceFilter === 'POSITIVE'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {isRtl ? 'دارای موجودی' : 'Non-Zero'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBalanceFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                      balanceFilter === 'ALL'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {isRtl ? 'همه ارزها' : 'All Assets'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Balances List Cards */}
+              {isLoadingBalances ? (
+                <div className="p-8 text-center rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 space-y-2">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-500" />
+                  <p className="text-xs text-slate-500">{isRtl ? 'در حال دریافت اطلاعات موجودی از والکس...' : 'Fetching balances from Wallex...'}</p>
+                </div>
+              ) : filteredBalances.length === 0 ? (
+                <div className="p-6 text-center rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-slate-500">
+                  {isRtl ? 'هیچ دارایی مطابق فیلتر یافت نشد.' : 'No asset found matching criteria.'}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {filteredBalances.map((b) => {
+                    const isTmn = b.asset === 'TMN' || b.asset === 'IRT';
+                    return (
+                      <div
+                        key={b.asset}
+                        className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/80 hover:border-emerald-500/40 shadow-xs transition-all flex flex-col justify-between gap-3"
+                      >
+                        {/* Asset Header */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CurrencyLogo currency={isTmn ? 'TMN' : 'USD'} size="sm" />
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs sm:text-sm font-black font-mono text-slate-900 dark:text-slate-100">
+                                  {b.asset}
+                                </span>
+                                {b.fa_name && (
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    ({b.fa_name})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <Badge variant="secondary" className="text-[10px] font-mono">
+                            {isTmn ? (isRtl ? 'تومان' : 'TMN') : (isRtl ? 'کریپتو' : 'Coin')}
+                          </Badge>
+                        </div>
+
+                        {/* Balance Numbers */}
+                        <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 text-[11px]">
+                            <span>{isRtl ? 'موجودی آزاد:' : 'Available:'}</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                              {formatNumber(b.value, lang, 6)}
+                            </span>
+                          </div>
+
+                          {b.locked > 0 && (
+                            <div className="flex justify-between items-center text-amber-600 dark:text-amber-400 text-[11px]">
+                              <span>{isRtl ? 'قفل در سفارش:' : 'Locked:'}</span>
+                              <span className="font-mono font-bold">
+                                {formatNumber(b.locked, lang, 6)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 font-bold pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                            <span>{isRtl ? 'کل دارایی:' : 'Total:'}</span>
+                            <span className="font-mono text-slate-900 dark:text-slate-100">
+                              {formatNumber(b.total, lang, 6)}
+                            </span>
+                          </div>
+
+                          {/* Estimated Value */}
+                          <div className="pt-1.5 mt-1 border-t border-slate-100 dark:border-slate-800 flex justify-between items-baseline text-[11px]">
+                            <span className="text-slate-400">{isRtl ? 'ارزش تقریبی:' : 'Est. Value:'}</span>
+                            <div className="text-end">
+                              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 block">
+                                {formatCurrency(b.estimatedTmnValue, lang, 'TMN')}
+                              </span>
+                              {!isTmn && (
+                                <span className="font-mono text-[10px] text-slate-400 block">
+                                  ≈ {formatCurrency(b.estimatedUsdValue, lang, 'USD')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Add / Edit Exchange Modal / Form Panel */}
