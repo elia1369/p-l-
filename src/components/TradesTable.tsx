@@ -323,7 +323,9 @@ export const TradesTable: React.FC<Props> = ({
                     <td className="py-2.5 px-3.5 text-start font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span>{trade.symbol}</span>
-                        <CurrencyLogo symbolOrCurrency={trade.symbol} lang={lang} size="xs" showLabel={false} />
+                        <span className="hidden">
+                          <CurrencyLogo symbolOrCurrency={trade.symbol} lang={lang} size="xs" showLabel={false} />
+                        </span>
                       </div>
                     </td>
                     <td className="py-2.5 px-3.5 text-center whitespace-nowrap font-sans">

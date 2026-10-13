@@ -680,7 +680,7 @@ export const CurrentPricePnLBox: React.FC<Props> = ({
                   <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200">
                     {t.calculatedPnL} ({activeAsset.symbol})
                   </span>
-                  <span className="ms-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  <span className="ms-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hidden">
                     {isPositionOpen 
                       ? (lang === 'fa' ? '• موقعیت باز با نرخ لحظه‌ای' : '• Open Position vs Live Price') 
                       : (lang === 'fa' ? '• موقعیت بسته شده (تحقق‌یافته قطعی)' : '• Closed Position (Realized P&L)')}
