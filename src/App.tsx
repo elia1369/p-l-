@@ -7,6 +7,7 @@ import { AssetAnalyzer } from './components/AssetAnalyzer';
 import { TradesTable } from './components/TradesTable';
 import { PiiShieldModal } from './components/PiiShieldModal';
 import { WhatIfSimulatorModal } from './components/WhatIfSimulatorModal';
+import { ReportExportModal } from './components/ReportExportModal';
 import { 
   TradeRecord, 
   Language, 
@@ -23,6 +24,8 @@ import {
   getDemoTrades, 
   exportPnLReportToExcel 
 } from './utils/excelParser';
+import { parsePortfolioDataBackup } from './utils/pdfExport';
+import { WallexAccountBalancesResult } from './utils/wallexApi';
 import { translations } from './utils/i18n';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import bgWallpaperDark from './assets/images/crypto_fintech_bg_1790403820718.jpg';
@@ -52,6 +55,9 @@ function MainDashboard() {
   // Modals state
   const [isPiiModalOpen, setIsPiiModalOpen] = useState(false);
   const [simulatorAsset, setSimulatorAsset] = useState<AssetAnalysis | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [latestAccountBalances, setLatestAccountBalances] = useState<WallexAccountBalancesResult | null>(null);
+  const [activeAccountLabel, setActiveAccountLabel] = useState<string>('والکس (کلید خصوصی)');
 
   // 2. Initialize with Demo Trades on first mount so app looks rich and ready
   useEffect(() => {
@@ -90,10 +96,35 @@ function MainDashboard() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // 5. Excel File Handler
+  // 5. Excel & JSON File Handler
   const handleFileSelected = async (file: File) => {
     setIsLoadingFile(true);
     try {
+      // Check if uploaded file is a JSON backup file (to bypass 3-month API limits)
+      if (file.name.toLowerCase().endsWith('.json')) {
+        const text = await file.text();
+        const parseRes = parsePortfolioDataBackup(text);
+        if (!parseRes.success || !parseRes.data) {
+          throw new Error(parseRes.error || (lang === 'fa' ? 'خطا در بازخوانی فایل پشتیبان دیتای JSON' : 'Failed to parse JSON backup'));
+        }
+        setTrades(parseRes.data.trades);
+        if (parseRes.data.accountBalances) {
+          setLatestAccountBalances(parseRes.data.accountBalances);
+        }
+        if (parseRes.data.accountLabel) {
+          setActiveAccountLabel(parseRes.data.accountLabel);
+        }
+        setUploadedFileName(file.name);
+        setPiiReport({
+          columnsSanitized: ['User_Secrets', 'Signature', 'Backup_Checksum'],
+          rowsScanned: parseRes.data.trades.length,
+          sensitiveValuesDetected: parseRes.data.trades.length,
+          clientOnlyVerified: true,
+          scanTimestamp: new Date().toLocaleTimeString(),
+        });
+        return;
+      }
+
       const result = await parseExcelFile(file);
       setTrades(result.trades);
       setPiiReport(result.piiReport);
@@ -104,7 +135,7 @@ function MainDashboard() {
         setIsPiiModalOpen(true);
       }
     } catch (err: any) {
-      alert(err?.message || (lang === 'fa' ? 'خطا در خواندن فایل اکسل' : 'Error parsing Excel file'));
+      alert(err?.message || (lang === 'fa' ? 'خطا در خواندن فایل' : 'Error parsing file'));
     } finally {
       setIsLoadingFile(false);
     }
@@ -180,6 +211,7 @@ function MainDashboard() {
   const handleTradesSyncedFromApi = (syncedTrades: TradeRecord[], exchangeName: string, _currency: string) => {
     setTrades(syncedTrades);
     setUploadedFileName(`API_${exchangeName}`);
+    setActiveAccountLabel(exchangeName);
     setPiiReport({
       columnsSanitized: ['Account_Secret_Key', 'API_Token_Signature', 'Internal_User_ID', 'IP_Address'],
       rowsScanned: syncedTrades.length,
@@ -253,6 +285,7 @@ function MainDashboard() {
           onClear={handleClearData}
           hasTrades={trades.length > 0}
           onExportExcel={handleExportExcel}
+          onOpenExportReport={() => setIsExportModalOpen(true)}
         />
       </div>
 
@@ -334,6 +367,8 @@ function MainDashboard() {
               onTradesSyncedFromApi={handleTradesSyncedFromApi}
               onOpenPiiModal={() => setIsPiiModalOpen(true)}
               piiReport={piiReport}
+              onBalancesLoaded={(balances) => setLatestAccountBalances(balances)}
+              onOpenExportReport={() => setIsExportModalOpen(true)}
             />
 
             {/* Overview Metrics Cards */}
@@ -369,6 +404,7 @@ function MainDashboard() {
                 onAddTrade={handleAddTrade}
                 onExportExcel={handleExportExcel}
                 onToggleSide={handleToggleTradeSide}
+                onOpenExportReport={() => setIsExportModalOpen(true)}
               />
             )}
           </>
@@ -411,6 +447,19 @@ function MainDashboard() {
           setTrades(restoredTrades);
           setUploadedFileName('پورتفوی ابری بازیابی‌شده');
         }}
+      />
+
+      {/* Designed PDF & Data Export Hub Modal */}
+      <ReportExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        lang={lang}
+        trades={trades}
+        assets={assetAnalyses}
+        summary={portfolioSummary}
+        accountBalances={latestAccountBalances}
+        accountLabel={activeAccountLabel}
+        onExportExcel={handleExportExcel}
       />
     </div>
   );

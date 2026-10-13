@@ -7,7 +7,8 @@ import {
   Plus, 
   FileSpreadsheet, 
   Calendar,
-  X
+  X,
+  FileDown
 } from 'lucide-react';
 import { TradeRecord, TradeSide, Language } from '../types';
 import { translations, formatCurrency, formatNumber } from '../utils/i18n';
@@ -20,6 +21,7 @@ interface Props {
   onAddTrade: (trade: Omit<TradeRecord, 'id'>) => void;
   onExportExcel: () => void;
   onToggleSide?: (id: string) => void;
+  onOpenExportReport?: () => void;
 }
 
 export const TradesTable: React.FC<Props> = ({
@@ -29,6 +31,7 @@ export const TradesTable: React.FC<Props> = ({
   onAddTrade,
   onExportExcel,
   onToggleSide,
+  onOpenExportReport,
 }) => {
   const t = translations[lang];
 
@@ -145,13 +148,26 @@ export const TradesTable: React.FC<Props> = ({
               <span>{lang === 'fa' ? 'افزودن معامله جدید' : 'Add Trade'}</span>
             </button>
 
+            {onOpenExportReport && (
+              <button
+                id="export-pdf-trades-btn"
+                type="button"
+                onClick={onOpenExportReport}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-bold shadow-xs active:scale-95 transition cursor-pointer"
+                title={lang === 'fa' ? 'تهیه خروجی PDF دیزاین شده با نمودارها و فایل پشتیبان دیتا' : 'Export styled PDF report and data backup'}
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                <span>{lang === 'fa' ? 'خروجی PDF و داده‌ها' : 'Export PDF & Data'}</span>
+              </button>
+            )}
+
             <button
               id="export-trades-btn"
               type="button"
               onClick={onExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-300/70 dark:border-slate-700 transition cursor-pointer"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.exportReport}</span>
             </button>
           </div>

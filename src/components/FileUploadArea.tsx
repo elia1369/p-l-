@@ -23,6 +23,8 @@ interface Props {
   onTradesSyncedFromApi?: (trades: TradeRecord[], exchangeName: string, currency: CurrencyKind) => void;
   onOpenPiiModal?: () => void;
   piiReport?: PIIReport | null;
+  onBalancesLoaded?: (balances: any) => void;
+  onOpenExportReport?: () => void;
 }
 
 export const FileUploadArea: React.FC<Props> = ({
@@ -38,6 +40,8 @@ export const FileUploadArea: React.FC<Props> = ({
   onTradesSyncedFromApi,
   onOpenPiiModal,
   piiReport,
+  onBalancesLoaded,
+  onOpenExportReport,
 }) => {
   const isRtl = lang === 'fa';
   const t = translations[lang];
@@ -48,14 +52,14 @@ export const FileUploadArea: React.FC<Props> = ({
 
   const handleFileProcess = (file: File) => {
     setErrorMessage(null);
-    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const validExtensions = ['.xlsx', '.xls', '.csv', '.json'];
     const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (!hasValidExt) {
       setErrorMessage(
         lang === 'fa' 
-          ? 'لطفاً فقط فایل‌های اکسل (.xlsx, .xls) یا CSV معتبر انتخاب فرمایید.' 
-          : 'Please select a valid Excel (.xlsx, .xls) or CSV file.'
+          ? 'لطفاً فقط فایل‌های اکسل (.xlsx, .xls, .csv) یا فایل پشتیبان دیتای والکس (.json) انتخاب فرمایید.' 
+          : 'Please select a valid Excel (.xlsx, .xls, .csv) or Wallex JSON backup file.'
       );
       return;
     }
@@ -98,7 +102,7 @@ export const FileUploadArea: React.FC<Props> = ({
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>{isRtl ? 'فایل اکسل' : 'Excel File'}</span>
+            <span>{isRtl ? 'فایل اکسل / دیتای پشتیبان (JSON)' : 'Excel / Backup JSON'}</span>
           </button>
         </div>
       </div>
@@ -112,6 +116,8 @@ export const FileUploadArea: React.FC<Props> = ({
             onLoadDemo={onLoadDemo}
             onOpenPiiModal={onOpenPiiModal}
             piiReport={piiReport}
+            onBalancesLoaded={onBalancesLoaded}
+            onOpenExportReport={onOpenExportReport}
             onTradesSynced={(syncedTrades, exchangeName, currency) => {
               if (onTradesSyncedFromApi) {
                 onTradesSyncedFromApi(syncedTrades, exchangeName, currency);
@@ -133,20 +139,20 @@ export const FileUploadArea: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Tab 2: Excel Dropzone */}
+      {/* Tab 2: Excel / JSON Dropzone */}
       {activeTab === 'EXCEL' && (
         <div className="space-y-4">
           <FileUploader
             id="excel-dropzone"
-            accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
+            accept=".xlsx, .xls, .csv, .json, application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
             maxSizeMB={25}
             isLoading={isLoading}
             fileName={fileName}
             errorMessage={errorMessage}
             onFileSelect={handleFileProcess}
             onDownloadTemplate={downloadExcelTemplate}
-            title={t.uploadZoneTitle}
-            description={t.uploadZoneDesc}
+            title={isRtl ? 'بارگذاری فایل اکسل معاملات یا فایل دیتای پشتیبان (JSON)' : t.uploadZoneTitle}
+            description={isRtl ? 'پشتیبانی از اکسل خروجی صرافی‌ها (.xlsx, .csv) و فایل پشتیبان ذخیره‌شده TradeSmart (.json) جهت بازیابی سوابق بیش از ۳ ماه' : t.uploadZoneDesc}
             uploadButtonText={t.uploadBtn}
             downloadButtonText={t.downloadTemplateBtn}
             isRtl={lang === 'fa'}

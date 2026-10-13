@@ -23,7 +23,8 @@ import {
   FileCheck2,
   ExternalLink,
   Wallet,
-  Layers
+  Layers,
+  FileDown
 } from 'lucide-react';
 import { Language, TradeRecord, CurrencyKind, PIIReport } from '../types';
 import { Button } from './ui/button';
@@ -60,6 +61,8 @@ interface Props {
   onLoadDemo?: () => void;
   onOpenPiiModal?: () => void;
   piiReport?: PIIReport | null;
+  onBalancesLoaded?: (balances: WallexAccountBalancesResult) => void;
+  onOpenExportReport?: () => void;
 }
 
 // Preset popular exchange suggestions for fast autocomplete
@@ -105,6 +108,8 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
   onTradesSynced,
   onOpenPiiModal,
   piiReport,
+  onBalancesLoaded,
+  onOpenExportReport,
 }) => {
   const isRtl = lang === 'fa';
 
@@ -166,6 +171,9 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
     try {
       const res = await fetchWallexBalances(target.privateApiKey);
       setAccountBalances(res);
+      if (onBalancesLoaded) {
+        onBalancesLoaded(res);
+      }
     } catch (err: any) {
       setBalancesError(err?.message || (isRtl ? 'خطا در دریافت موجودی دارایی‌ها' : 'Failed to fetch account balances'));
     } finally {
@@ -766,6 +774,36 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
                     <span className="font-mono">{accountBalances.timestamp}</span>
                   </div>
                 </div>
+
+                {/* 3-Month Limitation Bypass & Export Action Bar */}
+                {onOpenExportReport && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                        <FileDown className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                          {isRtl ? 'دریافت خروجی PDF و فایل دیتا (حل محدودیت ۳ ماهه والکس)' : 'Export PDF Report & Data Archive (Solves 90-Day Limit)'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {isRtl ? 'ذخیره گزارش تصویری و دانلود دیتای خام JSON جهت حفظ معاملات فراتر از محدودیت سه‌ماهه صرافی' : 'Download multi-page PDF & JSON archive to keep lifetime records'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={onOpenExportReport}
+                      className="gap-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-black shadow-md shadow-emerald-600/20 hover:from-emerald-500 hover:to-cyan-500 cursor-pointer text-xs shrink-0"
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      <span>{isRtl ? 'صدور خروجی PDF و داده‌ها' : 'Export PDF & Data'}</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

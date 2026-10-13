@@ -9,7 +9,8 @@ import {
   RotateCcw,
   User,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  FileDown
 } from 'lucide-react';
 import { Language, ThemeMode, PIIReport } from '../types';
 import { translations } from '../utils/i18n';
@@ -28,6 +29,7 @@ interface Props {
   onClear: () => void;
   hasTrades: boolean;
   onExportExcel: () => void;
+  onOpenExportReport?: () => void;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -41,6 +43,7 @@ export const Navbar: React.FC<Props> = ({
   onClear,
   hasTrades,
   onExportExcel,
+  onOpenExportReport,
 }) => {
   const t = translations[lang];
   const { user, openAuthModal, openPortal } = useAuth();
@@ -147,14 +150,29 @@ export const Navbar: React.FC<Props> = ({
               {t.loadDemoBtn}
             </button>
           ) : (
-            <button
-              id="clear-data-nav-btn"
-              onClick={onClear}
-              title={t.clearData}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {onOpenExportReport && (
+                <button
+                  id="nav-export-report-btn"
+                  type="button"
+                  onClick={onOpenExportReport}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-black shadow-xs active:scale-95 transition cursor-pointer"
+                  title={lang === 'fa' ? 'دریافت خروجی PDF و پشتیبان داده‌ها' : 'Export PDF & Data Backup'}
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{lang === 'fa' ? 'خروجی PDF و گزارش' : 'Export PDF'}</span>
+                </button>
+              )}
+
+              <button
+                id="clear-data-nav-btn"
+                onClick={onClear}
+                title={t.clearData}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
           )}
 
           {/* Prominent Language Toggle "فارسی | EN" */}
