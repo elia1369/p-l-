@@ -79,9 +79,24 @@ export async function fetchWallexBalances(
     }
   }
 
-  // Find USDTTMN reference rate
-  const usdtMarket = markets.find(m => m.symbol.toUpperCase() === 'USDTTMN' || (m.base_asset === 'USDT' && m.quote_asset === 'TMN'));
-  const usdtTmnRate = usdtMarket ? parseFloat(usdtMarket.price || '95000') || 95000 : 95000;
+  // Build accurate live price lookup maps
+  const tmnPriceMap: Record<string, number> = {};
+  const usdtPriceMap: Record<string, number> = {};
+
+  for (const m of markets) {
+    const base = (m.base_asset || '').toUpperCase();
+    const quote = (m.quote_asset || '').toUpperCase();
+    const p = parseFloat(m.price || '0');
+    if (!isNaN(p) && p > 0) {
+      if (quote === 'TMN') tmnPriceMap[base] = p;
+      if (quote === 'USDT') usdtPriceMap[base] = p;
+    }
+  }
+
+  // Find live USDTTMN reference rate
+  const usdtMarket = markets.find(m => m.symbol.toUpperCase() === 'USDTTMN' || (m.base_asset.toUpperCase() === 'USDT' && m.quote_asset.toUpperCase() === 'TMN'));
+  const liveUsdtRate = parseFloat(usdtMarket?.price || '0');
+  const usdtTmnRate = (liveUsdtRate > 0) ? liveUsdtRate : (tmnPriceMap['USDT'] || 258000);
 
   const parsedBalances: WallexAssetBalance[] = [];
 
@@ -135,9 +150,7 @@ export async function fetchWallexBalances(
       { asset: 'USDT', fa_name: 'تتر', value: 1420.50, locked: 80.00, total: 1500.50, estimatedTmnValue: 1500.50 * usdtTmnRate, estimatedUsdValue: 1500.50 },
       { asset: 'BTC', fa_name: 'بیت کوین', value: 0.0854, locked: 0, total: 0.0854, estimatedTmnValue: 0, estimatedUsdValue: 0 },
       { asset: 'ETH', fa_name: 'اتریوم', value: 1.250, locked: 0.15, total: 1.400, estimatedTmnValue: 0, estimatedUsdValue: 0 },
-      { asset: 'SOL', fa_name: 'سولانا', value: 18.5, locked: 0, total: 18.5, estimatedTmnValue: 0, estimatedUsdValue: 0 },
-      { asset: 'TON', fa_name: 'تون کوین', value: 145.0, locked: 0, total: 145.0, estimatedTmnValue: 0, estimatedUsdValue: 0 },
-      { asset: 'ICP', fa_name: 'اینترنت کامپیوتر', value: 67.0, locked: 0, total: 67.0, estimatedTmnValue: 0, estimatedUsdValue: 0 }
+      { asset: 'SOL', fa_name: 'سولانا', value: 18.5, locked: 0, total: 18.5, estimatedTmnValue: 0, estimatedUsdValue: 0 }
     );
   }
 
@@ -145,50 +158,36 @@ export async function fetchWallexBalances(
   let totalPortfolioTmn = 0;
 
   parsedBalances.forEach(b => {
-    if (b.asset === 'TMN' || b.asset === 'IRT') {
-      b.estimatedTmnValue = b.total;
-      b.estimatedUsdValue = usdtTmnRate > 0 ? b.total / usdtTmnRate : 0;
-    } else if (b.asset === 'USDT' || b.asset === 'USD') {
-      b.estimatedUsdValue = b.total;
-      b.estimatedTmnValue = b.total * usdtTmnRate;
-    } else {
-      // Find market price in TMN or USDT
-      const tmnMarket = markets?.find(m => m.base_asset === b.asset && m.quote_asset === 'TMN');
-      const usdtMarketForCoin = markets?.find(m => m.base_asset === b.asset && m.quote_asset === 'USDT');
+    let estTmn = 0;
+    let estUsd = 0;
 
-      if (tmnMarket && parseFloat(tmnMarket.price || '0') > 0) {
-        const pTmn = parseFloat(tmnMarket.price || '0');
-        b.estimatedTmnValue = b.total * pTmn;
-        b.estimatedUsdValue = usdtTmnRate > 0 ? b.estimatedTmnValue / usdtTmnRate : 0;
-      } else if (usdtMarketForCoin && parseFloat(usdtMarketForCoin.price || '0') > 0) {
-        const pUsd = parseFloat(usdtMarketForCoin.price || '0');
-        b.estimatedUsdValue = b.total * pUsd;
-        b.estimatedTmnValue = b.estimatedUsdValue * usdtTmnRate;
-      } else {
-        // Fallback reference prices for popular coins
-        const fallbackUsdPrices: Record<string, number> = {
-          BTC: 96000,
-          ETH: 3450,
-          SOL: 220,
-          TON: 5.8,
-          ICP: 11.5,
-          ADA: 0.85,
-          DOGE: 0.38,
-          XRP: 2.45,
-          BNB: 650,
-          PAXG: 2900,
-        };
-        const pUsd = fallbackUsdPrices[b.asset] || 1;
-        b.estimatedUsdValue = b.total * pUsd;
-        b.estimatedTmnValue = b.estimatedUsdValue * usdtTmnRate;
-      }
+    if (b.asset === 'TMN' || b.asset === 'IRT') {
+      estTmn = b.total;
+      estUsd = usdtTmnRate > 0 ? b.total / usdtTmnRate : 0;
+    } else if (b.asset === 'USDT' || b.asset === 'USD') {
+      estUsd = b.total;
+      estTmn = b.total * usdtTmnRate;
+    } else if (tmnPriceMap[b.asset] && tmnPriceMap[b.asset] > 0) {
+      estTmn = b.total * tmnPriceMap[b.asset];
+      estUsd = usdtTmnRate > 0 ? estTmn / usdtTmnRate : 0;
+    } else if (usdtPriceMap[b.asset] && usdtPriceMap[b.asset] > 0) {
+      estUsd = b.total * usdtPriceMap[b.asset];
+      estTmn = estUsd * usdtTmnRate;
+    } else {
+      // Unpriced / delisted / suspended asset on Wallex (e.g. MDT, X with '-' status):
+      // DO NOT invent an artificial $1.00 USD! Value is 0 if no active trading price exists.
+      estTmn = 0;
+      estUsd = 0;
     }
+
+    b.estimatedTmnValue = isFinite(estTmn) ? estTmn : 0;
+    b.estimatedUsdValue = isFinite(estUsd) ? estUsd : 0;
 
     totalPortfolioTmn += b.estimatedTmnValue;
   });
 
   const totalPortfolioUsd = usdtTmnRate > 0 ? totalPortfolioTmn / usdtTmnRate : 0;
-  const activeAssetsCount = parsedBalances.filter(b => b.total > 0.00001).length;
+  const activeAssetsCount = parsedBalances.filter(b => b.total > 0.0000001 && (b.estimatedTmnValue > 0 || b.asset === 'TMN' || b.asset === 'USDT')).length;
 
   // Sort: TMN first, USDT second, then by estimated Toman value descending
   parsedBalances.sort((a, b) => {
@@ -350,6 +349,40 @@ export async function fetchWallexMarkets(forceRefresh = false): Promise<WallexMa
   }
 
   throw new Error('خطا در دریافت لیست نمادهای بازارهای والکس');
+}
+
+/**
+ * Fast lookup dictionary of real-time market prices for all Wallex trading pairs.
+ * Maps symbols as 'BCH/TMN', 'BCHTMN', 'BCH/USDT', 'BCHUSDT', and base coins 'BCH'.
+ */
+export async function fetchLiveWallexPriceMap(): Promise<Record<string, number>> {
+  try {
+    const markets = await fetchWallexMarkets();
+    const map: Record<string, number> = {};
+
+    for (const m of markets) {
+      const p = parseFloat(m.price || '0');
+      if (!isNaN(p) && p > 0) {
+        const sym = m.symbol.toUpperCase();
+        map[sym] = p;
+        if (m.base_asset && m.quote_asset) {
+          const base = m.base_asset.toUpperCase();
+          const quote = m.quote_asset.toUpperCase();
+          map[`${base}/${quote}`] = p;
+          map[`${base}-${quote}`] = p;
+          // If quote is TMN, also map base directly
+          if (quote === 'TMN' && !map[base]) {
+            map[base] = p;
+          }
+        }
+      }
+    }
+
+    return map;
+  } catch (err) {
+    console.error('Failed to fetch live Wallex price map:', err);
+    return {};
+  }
 }
 
 /**
