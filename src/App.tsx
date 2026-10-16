@@ -25,7 +25,7 @@ import {
   exportPnLReportToExcel 
 } from './utils/excelParser';
 import { parsePortfolioDataBackup } from './utils/pdfExport';
-import { WallexAccountBalancesResult } from './utils/wallexApi';
+import { WallexAccountBalancesResult, fetchLiveWallexPriceMap } from './utils/wallexApi';
 import { translations } from './utils/i18n';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import bgWallpaperDark from './assets/images/crypto_fintech_bg_1790403820718.jpg';
@@ -59,7 +59,22 @@ function MainDashboard() {
   const [latestAccountBalances, setLatestAccountBalances] = useState<WallexAccountBalancesResult | null>(null);
   const [activeAccountLabel, setActiveAccountLabel] = useState<string>('والکس (کلید خصوصی)');
 
-  // 2. Initialize with Demo Trades on first mount so app looks rich and ready
+  // Auto-sync real-time market prices from Wallex
+  const syncLivePrices = async () => {
+    try {
+      const liveMap = await fetchLiveWallexPriceMap();
+      if (liveMap && Object.keys(liveMap).length > 0) {
+        setCustomPrices(prev => ({
+          ...prev,
+          ...liveMap,
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load Wallex live prices:', e);
+    }
+  };
+
+  // 2. Initialize with Demo Trades and Live Market Rates on first mount
   useEffect(() => {
     const demoTrades = getDemoTrades();
     setTrades(demoTrades);
@@ -71,6 +86,7 @@ function MainDashboard() {
       scanTimestamp: new Date().toLocaleTimeString(),
     });
     setUploadedFileName('demo_trades_portfolio.xlsx');
+    syncLivePrices();
   }, []);
 
   // 3. Sync Language & RTL direction
@@ -208,7 +224,20 @@ function MainDashboard() {
     });
   };
 
-  const handleTradesSyncedFromApi = (syncedTrades: TradeRecord[], exchangeName: string, _currency: string) => {
+  const handleTradesSyncedFromApi = (
+    syncedTrades: TradeRecord[], 
+    exchangeName: string, 
+    _currency: string,
+    livePriceMap?: Record<string, number>
+  ) => {
+    // 1. Immediately apply real-time market prices for open assets so initial P&L is 100% accurate
+    if (livePriceMap && Object.keys(livePriceMap).length > 0) {
+      setCustomPrices(prev => ({
+        ...prev,
+        ...livePriceMap,
+      }));
+    }
+    // 2. Set synced trades
     setTrades(syncedTrades);
     setUploadedFileName(`API_${exchangeName}`);
     setActiveAccountLabel(exchangeName);
@@ -219,6 +248,8 @@ function MainDashboard() {
       clientOnlyVerified: true,
       scanTimestamp: new Date().toLocaleTimeString(),
     });
+    // Secondary background refresh to ensure all symbols are populated
+    syncLivePrices();
   };
 
   // 8. Derived Calculations

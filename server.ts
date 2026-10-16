@@ -14,6 +14,17 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Enable CORS and custom headers (x-api-key, Authorization)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, x-api-key, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Lazy initializer for Gemini client to prevent crashes if key is absent
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
@@ -82,7 +93,7 @@ app.get(["/v1/markets", "/hector/web/v1/markets", "/api/wallex/markets"], async 
 });
 
 // Proxy endpoint for Wallex Account Balances API: GET /v1/account/balances
-app.all("/api/wallex/account/balances", async (req, res) => {
+app.all(["/api/wallex/account/balances", "/v1/account/balances", "/v2/account/balances"], async (req, res) => {
   try {
     const apiKey = (req.headers["x-api-key"] as string) || req.body?.apiKey || (req.query?.apiKey as string);
     if (!apiKey) {
@@ -95,7 +106,7 @@ app.all("/api/wallex/account/balances", async (req, res) => {
     const response = await fetch("https://api.wallex.ir/v1/account/balances", {
       method: "GET",
       headers: {
-        "x-api-key": apiKey,
+        "x-api-key": apiKey.trim(),
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
       },
@@ -118,7 +129,7 @@ app.all("/api/wallex/account/balances", async (req, res) => {
 });
 
 // Proxy endpoint for Wallex Account Trades API: GET /v1/account/trades?symbol=[SYMBOL]
-app.all("/api/wallex/account/trades", async (req, res) => {
+app.all(["/api/wallex/account/trades", "/v1/account/trades"], async (req, res) => {
   try {
     const apiKey = (req.headers["x-api-key"] as string) || req.body?.apiKey || (req.query?.apiKey as string);
     const symbol = (req.query?.symbol as string) || req.body?.symbol;
@@ -141,7 +152,7 @@ app.all("/api/wallex/account/trades", async (req, res) => {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "x-api-key": apiKey,
+        "x-api-key": apiKey.trim(),
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
       },
@@ -158,6 +169,42 @@ app.all("/api/wallex/account/trades", async (req, res) => {
     res.status(502).json({
       success: false,
       error: "خطا در ارتباط با وب‌سرویس معاملات والکس (Wallex Trades API error).",
+      details: error?.message,
+    });
+  }
+});
+
+// Proxy endpoint for Wallex Open Orders API: GET /v1/account/openOrders
+app.all(["/api/wallex/account/openOrders", "/api/wallex/account/open-orders", "/v1/account/openOrders", "/v1/account/open-orders"], async (req, res) => {
+  try {
+    const apiKey = (req.headers["x-api-key"] as string) || req.body?.apiKey || (req.query?.apiKey as string);
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: "کلید x-api-key ارسال نشده است.",
+      });
+    }
+
+    const response = await fetch("https://api.wallex.ir/v1/account/openOrders", {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey.trim(),
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; WallexTradePortfolio/1.0)",
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Failed to proxy Wallex open orders:", error?.message || error);
+    res.status(502).json({
+      success: false,
+      error: "خطا در دریافت سفارش‌های باز والکس",
       details: error?.message,
     });
   }

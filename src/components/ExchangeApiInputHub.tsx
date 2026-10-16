@@ -56,7 +56,7 @@ import {
 
 interface Props {
   lang: Language;
-  onTradesSynced: (trades: TradeRecord[], exchangeName: string, currency: CurrencyKind) => void;
+  onTradesSynced: (trades: TradeRecord[], exchangeName: string, currency: CurrencyKind, livePriceMap?: Record<string, number>) => void;
   isLoading?: boolean;
   onLoadDemo?: () => void;
   onOpenPiiModal?: () => void;
@@ -168,6 +168,7 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
     if (!target) return;
     setIsLoadingBalances(true);
     setBalancesError(null);
+    setAccountBalances(null); // Clear previous balance immediately so old account values never linger
     try {
       const res = await fetchWallexBalances(target.privateApiKey);
       setAccountBalances(res);
@@ -388,8 +389,11 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
       setSelectedAccountId(newOrUpdatedAccount.id);
       setIsFormOpen(false);
 
-      // Trigger Main App P&L calculation with fetched trades
-      onTradesSynced(result.trades, newOrUpdatedAccount.exchangeName, result.summary.currency);
+      // Trigger Main App P&L calculation with fetched trades and immediate live price map
+      onTradesSynced(result.trades, newOrUpdatedAccount.exchangeName, result.summary.currency, result.livePriceMap);
+
+      // Refresh balances immediately
+      handleLoadAccountBalances(newOrUpdatedAccount);
 
       setSuccessMessage(
         isRtl
@@ -434,7 +438,11 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
       const updatedList = saveExchangeAccount(updatedAccount);
       setAccounts(updatedList);
 
-      onTradesSynced(result.trades, account.exchangeName, result.summary.currency);
+      // Pass synced trades and live price map atomically to App.tsx
+      onTradesSynced(result.trades, account.exchangeName, result.summary.currency, result.livePriceMap);
+
+      // Refresh balances immediately
+      handleLoadAccountBalances(account);
 
       setSuccessMessage(
         isRtl
@@ -719,7 +727,7 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
                     <div className="absolute top-0 end-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
                     <div className="flex items-center justify-between">
                       <span className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">
-                        {isRtl ? 'ارزش کل بالانس کیف پول (تومان):' : 'Total Portfolio Balance (TMN):'}
+                        {isRtl ? `ارزش کل بالانس کیف پول (${selectedAccount?.accountLabel || 'حساب فعال'}):` : `Total Portfolio Balance (${selectedAccount?.accountLabel || 'Active Account'}):`}
                       </span>
                       <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                         <Coins className="h-5 w-5" />
@@ -728,9 +736,11 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
                     <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 pt-1">
                       {formatCurrency(accountBalances.totalPortfolioTmn, lang, 'TMN')}
                     </div>
-                    <p className="text-[11px] text-slate-400 hidden">
-                      {isRtl ? 'ارزش تجمیعی موجودی تمام دارایی‌ها به تومان' : 'Aggregate value of all wallet assets in Toman'}
-                    </p>
+                    <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                      {isRtl 
+                        ? `معادل ریالی: ${formatNumber(Math.round(accountBalances.totalPortfolioTmn * 10), lang)} ریال`
+                        : `≈ ${formatNumber(Math.round(accountBalances.totalPortfolioTmn * 10), lang)} IRR`}
+                    </div>
                   </div>
 
                   {/* 2. Total USD Equivalent */}
@@ -774,6 +784,68 @@ export const ExchangeApiInputHub: React.FC<Props> = ({
                     <span className="font-mono">{accountBalances.timestamp}</span>
                   </div>
                 </div>
+
+                {/* Active Assets Breakdown Table */}
+                {accountBalances.balances && accountBalances.balances.length > 0 && (
+                  <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/70 dark:bg-slate-900/70 overflow-hidden shadow-xs">
+                    <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                        <Coins className="h-4 w-4 text-emerald-500" />
+                        <span>{isRtl ? 'تفکیک دارایی‌ها و موجودی کیف‌پول:' : 'Asset Balance Breakdown:'}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {isRtl ? 'محاسبه‌شده بر اساس نرخ لحظه‌ای والکس' : 'Live Wallex Rates Applied'}
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80 max-h-60 overflow-y-auto">
+                      {accountBalances.balances
+                        .filter(b => b.total > 0.0000001 && (b.estimatedTmnValue > 100 || b.asset === 'TMN' || b.asset === 'USDT'))
+                        .map((b) => (
+                          <div key={b.asset} className="p-3 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black font-mono flex items-center justify-center text-xs shrink-0">
+                                {b.asset.slice(0, 4)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 truncate">
+                                  <span>{b.fa_name || b.asset}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({b.asset})</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+                                  <span>{isRtl ? 'کل موجودی:' : 'Total:'} <b className="font-mono text-slate-700 dark:text-slate-300">{formatNumber(b.total, lang)}</b></span>
+                                  {b.locked > 0 && (
+                                    <span className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded-md">
+                                      {isRtl ? 'قفل در سفارش باز:' : 'Locked:'} <b className="font-mono">{formatNumber(b.locked, lang)}</b>
+                                    </span>
+                                  )}
+                                  {b.locked > 0 && (
+                                    <span>
+                                      {isRtl ? 'در دسترس:' : 'Free:'} <b className="font-mono text-emerald-600 dark:text-emerald-400">{formatNumber(b.value, lang)}</b>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-end shrink-0">
+                              <div className="font-bold font-mono text-slate-900 dark:text-slate-100">
+                                {b.asset === 'TMN' || b.asset === 'IRT'
+                                  ? `${formatNumber(b.total, lang)} ${isRtl ? 'تومان' : 'TMN'}`
+                                  : `${formatCurrency(b.estimatedTmnValue, lang, 'TMN')}`
+                                }
+                              </div>
+                              {b.asset !== 'TMN' && b.asset !== 'IRT' && (
+                                <div className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400">
+                                  ≈ ${formatNumber(b.estimatedUsdValue, lang, 2)} USDT
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 3-Month Limitation Bypass & Export Action Bar */}
                 {onOpenExportReport && (

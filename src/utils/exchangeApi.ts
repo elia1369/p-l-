@@ -1,6 +1,6 @@
 import { TradeRecord, CurrencyKind } from '../types';
 import { formatToJalali, formatToJalaliVerbose } from './jalali';
-import { syncWallexRawTrades } from './wallexApi';
+import { syncWallexRawTrades, fetchLiveWallexPriceMap } from './wallexApi';
 
 export interface CustomExchangeAccount {
   id: string;
@@ -97,6 +97,7 @@ export async function syncTradesByPrivateApiKey(params: {
   endDate?: string;
 }): Promise<{
   trades: TradeRecord[];
+  livePriceMap?: Record<string, number>;
   summary: {
     exchangeName: string;
     syncedOrdersCount: number;
@@ -105,38 +106,53 @@ export async function syncTradesByPrivateApiKey(params: {
     dateSpanNotice: string;
   };
 }> {
-  // If connection is for Wallex, attempt the real 2-step Wallex API flow (Balances -> Active Symbol Trades)
-  const isWallex = params.exchangeName.includes('والکس') || 
-                   params.exchangeName.toLowerCase().includes('wallex') || 
-                   params.privateApiKey.startsWith('wlx_');
+  const cleanKey = (params.privateApiKey || '').trim();
+  const isWallexKeyFormat = /^\d+\|[a-zA-Z0-9_\-]+$/.test(cleanKey) || cleanKey.startsWith('wlx_');
+  const isWallex = isWallexKeyFormat || 
+                   params.exchangeName.includes('والکس') || 
+                   params.exchangeName.toLowerCase().includes('wallex');
 
-  if (isWallex && params.privateApiKey && params.privateApiKey !== 'wlx_sec_9948271049281740294817492810471928471029') {
+  if (isWallex && cleanKey && cleanKey !== 'wlx_sec_9948271049281740294817492810471928471029') {
     try {
-      const wallexTrades = await syncWallexRawTrades(params.privateApiKey, {
-        startDate: params.dateRangeMode === 'CUSTOM' ? params.startDate : undefined,
-        endDate: params.dateRangeMode === 'CUSTOM' ? params.endDate : undefined,
-      });
+      const [wallexTrades, livePriceMap] = await Promise.all([
+        syncWallexRawTrades(cleanKey, {
+          startDate: params.dateRangeMode === 'CUSTOM' ? params.startDate : undefined,
+          endDate: params.dateRangeMode === 'CUSTOM' ? params.endDate : undefined,
+        }),
+        fetchLiveWallexPriceMap().catch(() => ({} as Record<string, number>))
+      ]);
 
+      const startShamsi = params.startDate ? formatToJalali(params.startDate) : 'ابتدا';
+      const endShamsi = params.endDate ? formatToJalali(params.endDate) : 'اکنون';
+      const dateNotice = params.dateRangeMode === 'CUSTOM' && (params.startDate || params.endDate)
+        ? `از ${startShamsi} تا ${endShamsi}`
+        : 'کل تاریخچه معاملات (Full History)';
+
+      let detectedCurrency: CurrencyKind = params.currency || 'TMN';
       if (wallexTrades.length > 0) {
-        const startShamsi = params.startDate ? formatToJalali(params.startDate) : 'ابتدا';
-        const endShamsi = params.endDate ? formatToJalali(params.endDate) : 'اکنون';
-        const dateNotice = params.dateRangeMode === 'CUSTOM' && (params.startDate || params.endDate)
-          ? `از ${startShamsi} تا ${endShamsi}`
-          : 'کل تاریخچه معاملات (Full History)';
-
-        return {
-          trades: wallexTrades,
-          summary: {
-            exchangeName: params.exchangeName,
-            syncedOrdersCount: wallexTrades.length,
-            currency: 'TMN',
-            syncTimestamp: new Date().toLocaleTimeString('fa-IR'),
-            dateSpanNotice: dateNotice,
-          }
-        };
+        let usdCount = 0;
+        let tmnCount = 0;
+        wallexTrades.forEach(t => {
+          if (t.currency === 'USD') usdCount++;
+          else tmnCount++;
+        });
+        detectedCurrency = usdCount > tmnCount ? 'USD' : 'TMN';
       }
-    } catch (err) {
-      console.warn('Live Wallex API sync attempt failed or returned empty; switching to validated active mock model:', err);
+
+      return {
+        trades: wallexTrades,
+        livePriceMap,
+        summary: {
+          exchangeName: params.exchangeName,
+          syncedOrdersCount: wallexTrades.length,
+          currency: detectedCurrency,
+          syncTimestamp: new Date().toLocaleTimeString('fa-IR'),
+          dateSpanNotice: dateNotice,
+        }
+      };
+    } catch (err: any) {
+      console.error('Live Wallex API sync error:', err);
+      throw new Error(err?.message || 'خطا در ارتباط با وب‌سرویس والکس و دریافت تاریخچه معاملات');
     }
   }
 

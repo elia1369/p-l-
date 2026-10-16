@@ -664,8 +664,8 @@ export const ReportExportModal: React.FC<Props> = ({
                       </div>
 
                       {/* SVG Bar Chart Graphic */}
-                      <div className="pt-2">
-                        <svg width="100%" height="150" viewBox="0 0 380 150" className="overflow-visible">
+                      <div className="pt-2 flex justify-center">
+                        <svg width="380" height="150" viewBox="0 0 380 150" style={{ width: '100%', maxWidth: '380px', height: '150px' }} className="overflow-visible">
                           {/* Grid horizontal lines */}
                           <line x1="40" y1="20" x2="360" y2="20" stroke="#e2e8f0" strokeDasharray="3 3" />
                           <line x1="40" y1="60" x2="360" y2="60" stroke="#e2e8f0" strokeDasharray="3 3" />
@@ -762,8 +762,8 @@ export const ReportExportModal: React.FC<Props> = ({
                         </span>
                       </div>
 
-                      <div className="pt-2">
-                        <svg width="100%" height="130" viewBox="0 0 460 130" className="overflow-visible">
+                      <div className="pt-2 flex justify-center">
+                        <svg width="460" height="130" viewBox="0 0 460 130" style={{ width: '100%', maxWidth: '460px', height: '130px' }} className="overflow-visible">
                           <defs>
                             <linearGradient id="trendGradientPdf" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />

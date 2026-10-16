@@ -207,9 +207,21 @@ export function calculateAssetAnalyses(
     }
 
     // Determine current market price:
-    // 1. User entered custom price
-    // 2. Fallback to last executed trade price, or avgBuyPrice
-    let currentPrice = customCurrentPrices[symbol];
+    // 1. Exact symbol match in price map (e.g. 'SAND/USDT')
+    // 2. Compact symbol match (e.g. 'SANDUSDT')
+    // 3. Base coin direct match (e.g. 'SAND')
+    // 4. Fallback to last executed trade price, or avgBuyPrice
+    const upperSym = symbol.toUpperCase();
+    const cleanSym = symbol.replace(/[\/\-_ ]/g, '').toUpperCase();
+    const baseCoin = symbol.split(/[\/\-_ ]/)[0].trim().toUpperCase();
+    let currentPrice = customCurrentPrices[symbol] || 
+                       customCurrentPrices[upperSym] ||
+                       customCurrentPrices[cleanSym] || 
+                       customCurrentPrices[baseCoin] ||
+                       (isUsd 
+                         ? (customCurrentPrices[`${baseCoin}/USDT`] || customCurrentPrices[`${baseCoin}USDT`]) 
+                         : (customCurrentPrices[`${baseCoin}/TMN`] || customCurrentPrices[`${baseCoin}TMN`]));
+
     if (currentPrice === undefined || currentPrice === null || currentPrice <= 0) {
       const lastTrade = sortedTrades[sortedTrades.length - 1];
       currentPrice = lastTrade ? lastTrade.price : (avgBuyPrice || avgSellPrice);

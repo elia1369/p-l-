@@ -103,48 +103,58 @@ export async function fetchWallexBalances(
   const rawBalances = rawData?.result?.balances || rawData?.result || rawData?.balances;
 
   if (rawBalances && typeof rawBalances === 'object') {
+    const processBalanceItem = (assetKey: string, b: any) => {
+      const asset = assetKey.toUpperCase();
+      if (!asset) return;
+
+      const rawVal = parseFloat(String(b.value ?? b.amount ?? '0')) || 0;
+      const locked = parseFloat(String(b.locked ?? b.freeze ?? '0')) || 0;
+
+      // In Wallex GET /v1/account/balances:
+      // "value" represents the TOTAL held balance of the asset.
+      // "locked" represents the amount currently reserved in open orders.
+      // Available (free to spend) = Math.max(0, total - locked).
+      let total = 0;
+      let available = 0;
+
+      if (b.total !== undefined && b.total !== null) {
+        total = parseFloat(String(b.total)) || 0;
+        available = b.available !== undefined ? (parseFloat(String(b.available)) || 0) : Math.max(0, total - locked);
+      } else if (b.available !== undefined && b.available !== null) {
+        available = parseFloat(String(b.available)) || 0;
+        total = available + locked;
+      } else {
+        total = rawVal;
+        available = Math.max(0, total - locked);
+      }
+
+      parsedBalances.push({
+        asset,
+        fa_name: b.fa_name || b.faName,
+        en_name: b.en_name || b.enName,
+        value: available,
+        locked,
+        total,
+        estimatedTmnValue: 0,
+        estimatedUsdValue: 0,
+      });
+    };
+
     if (Array.isArray(rawBalances)) {
       rawBalances.forEach((b: any) => {
         const asset = String(b.asset || b.symbol || b.coin || '').toUpperCase();
-        if (!asset) return;
-        const value = parseFloat(String(b.value || b.available || b.amount || '0')) || 0;
-        const locked = parseFloat(String(b.locked || b.freeze || '0')) || 0;
-        const total = value + locked;
-
-        parsedBalances.push({
-          asset,
-          fa_name: b.fa_name || b.faName,
-          en_name: b.en_name || b.enName,
-          value,
-          locked,
-          total,
-          estimatedTmnValue: 0,
-          estimatedUsdValue: 0,
-        });
+        processBalanceItem(asset, b);
       });
     } else {
       Object.entries<any>(rawBalances).forEach(([assetKey, b]) => {
-        const asset = assetKey.toUpperCase();
-        const value = parseFloat(String(b.value || b.available || b.amount || '0')) || 0;
-        const locked = parseFloat(String(b.locked || b.freeze || '0')) || 0;
-        const total = value + locked;
-
-        parsedBalances.push({
-          asset,
-          fa_name: b.fa_name || b.faName,
-          en_name: b.en_name || b.enName,
-          value,
-          locked,
-          total,
-          estimatedTmnValue: 0,
-          estimatedUsdValue: 0,
-        });
+        processBalanceItem(assetKey, b);
       });
     }
   }
 
-  // Fallback demo balances for preview if no live key or API error
-  if (parsedBalances.length === 0) {
+  // Fallback demo balances ONLY if key is explicitly the demo key or completely empty
+  const isDemoKey = !cleanKey || cleanKey === 'wlx_sec_9948271049281740294817492810471928471029';
+  if (parsedBalances.length === 0 && isDemoKey) {
     parsedBalances.push(
       { asset: 'TMN', fa_name: 'تومان', value: 45800000, locked: 2500000, total: 48300000, estimatedTmnValue: 48300000, estimatedUsdValue: 48300000 / usdtTmnRate },
       { asset: 'USDT', fa_name: 'تتر', value: 1420.50, locked: 80.00, total: 1500.50, estimatedTmnValue: 1500.50 * usdtTmnRate, estimatedUsdValue: 1500.50 },
@@ -753,19 +763,27 @@ export async function syncWallexRawTrades(
   let rawTrades = await fetchWallexTradesForSymbolPages(apiKey);
 
   if (rawTrades.length === 0) {
-    const markets = await fetchWallexMarkets();
-    const allSymbols = markets.map(m => m.symbol.toUpperCase());
-    const batchSize = 4;
-    for (let i = 0; i < allSymbols.length; i += batchSize) {
-      const batch = allSymbols.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(sym => fetchWallexTradesForSymbolPages(apiKey, sym))
-      );
-      for (const tradeList of batchResults) {
-        if (tradeList.length > 0) {
-          rawTrades.push(...tradeList);
+    // Targeted scan: Only check symbols for assets the user actually has balances in
+    try {
+      const bRes = await fetchWallexBalances(apiKey);
+      const activeCoins = bRes.balances.filter(b => b.total > 0.000001).map(b => b.asset);
+      const targetSymbols: string[] = [];
+      for (const coin of activeCoins) {
+        if (coin === 'TMN' || coin === 'USDT') continue;
+        targetSymbols.push(`${coin}USDT`, `${coin}TMN`);
+      }
+      if (targetSymbols.length > 0) {
+        const results = await Promise.all(
+          targetSymbols.map(sym => fetchWallexTradesForSymbolPages(apiKey, sym))
+        );
+        for (const tradeList of results) {
+          if (tradeList.length > 0) {
+            rawTrades.push(...tradeList);
+          }
         }
       }
+    } catch {
+      // fallback safe
     }
   }
 
